@@ -15,6 +15,9 @@ var DatabasePassword = os.Getenv("DATABASE_PASSWORD")
 var DatabaseName = os.Getenv("DATABASE_NAME")
 
 var SentinelURL = os.Getenv("SENTINEL_URL")
+var SentinelClientID = os.Getenv("SENTINEL_CLIENT_ID")
+var SentinelClientSecret = os.Getenv("SENTINEL_CLIENT_SECRET")
+var SentinelRedirectURI = os.Getenv("SENTINEL_REDIRECT_URI")
 
 var StorageBackend = os.Getenv("STORAGE_BACKEND")
 

@@ -42,6 +42,9 @@ func Verify() {
 	if SentinelURL == "" {
 		logger.SugarLogger.Fatal("SENTINEL_URL is required")
 	}
+	if SentinelClientID == "" || SentinelClientSecret == "" {
+		logger.SugarLogger.Warnf("SENTINEL_CLIENT_ID / SENTINEL_CLIENT_SECRET are not set, web login will be unavailable")
+	}
 	if StorageBackend == "" {
 		StorageBackend = "s3"
 		logger.SugarLogger.Infof("STORAGE_BACKEND is not set, defaulting to %s", StorageBackend)

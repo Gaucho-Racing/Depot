@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gaucho-racing/depot/depot/config"
+	"github.com/gaucho-racing/depot/depot/model"
 	"github.com/gaucho-racing/depot/depot/pkg/logger"
 	"github.com/gaucho-racing/depot/depot/pkg/sentinel"
 	"github.com/gin-contrib/cors"
@@ -42,6 +43,17 @@ func InitializeRouter() *gin.Engine {
 func InitializeRoutes(router *gin.Engine) {
 	router.GET("/ping", Ping)
 
+	router.POST("/auth/login", LoginWithSentinel)
+	router.GET("/auth/session", GetSession)
+	router.POST("/auth/refresh", RefreshSession)
+	router.POST("/auth/logout", Logout)
+	router.GET("/users/@me", GetCurrentUser)
+	router.GET("/groups", ListSentinelGroups)
+
+	router.GET("/stats", GetStats)
+	router.GET("/stats/activity", GetActivityStats)
+	router.GET("/files/search", SearchFiles)
+
 	router.GET("/buckets", ListBuckets)
 	router.POST("/buckets", CreateBucket)
 	router.GET("/buckets/:bucketName", GetBucket)
@@ -54,6 +66,7 @@ func InitializeRoutes(router *gin.Engine) {
 	router.PUT("/buckets/:bucketName/files/:id", UpdateFile)
 	router.DELETE("/buckets/:bucketName/files/:id", DeleteFile)
 	router.GET("/buckets/:bucketName/files/:id/content", GetFileContent)
+	router.GET("/buckets/:bucketName/files/:id/access-logs", GetFileAccessLogs)
 	router.POST("/buckets/:bucketName/files/:id/download-url", CreateDownloadURL)
 
 	router.POST("/buckets/:bucketName/uploads", InitiateUpload)
@@ -62,6 +75,11 @@ func InitializeRoutes(router *gin.Engine) {
 
 func AuthChecker() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if authRouteSkipsTokenValidation(c.Request.URL.Path) {
+			c.Next()
+			return
+		}
+
 		token := ""
 		authHeader := c.GetHeader("Authorization")
 		if strings.HasPrefix(authHeader, "Bearer ") {
@@ -78,6 +96,12 @@ func AuthChecker() gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+func authRouteSkipsTokenValidation(path string) bool {
+	return path == "/auth/login" ||
+		path == "/auth/refresh" ||
+		path == "/auth/logout"
 }
 
 func UnauthorizedPanicHandler() gin.HandlerFunc {
@@ -152,24 +176,36 @@ func RequestTokenIsAdmin(c *gin.Context) bool {
 		RequestTokenHasGroupName(c, "Admins")
 }
 
-func RequestTokenCanWriteBucket(c *gin.Context, bucketName string) bool {
+func RequestTokenHasAnyGroupName(c *gin.Context, groupNames []string) bool {
+	for _, groupName := range groupNames {
+		if RequestTokenHasGroupName(c, groupName) {
+			return true
+		}
+	}
+	return false
+}
+
+func RequestTokenCanWriteBucket(c *gin.Context, bucket model.Bucket) bool {
 	if !RequestTokenExists(c) {
 		return false
 	}
 	if RequestTokenIsAdmin(c) {
 		return true
 	}
-	return RequestTokenHasScope(c, "depot:"+bucketName+":write")
+	if RequestTokenHasScope(c, "depot:"+bucket.Name+":write") {
+		return true
+	}
+	return RequestTokenHasAnyGroupName(c, bucket.AccessGroupNames)
 }
 
-func RequestTokenCanReadBucket(c *gin.Context, bucketName string) bool {
+func RequestTokenCanReadBucket(c *gin.Context, bucket model.Bucket) bool {
 	if !RequestTokenExists(c) {
 		return false
 	}
-	if RequestTokenCanWriteBucket(c, bucketName) {
+	if RequestTokenCanWriteBucket(c, bucket) {
 		return true
 	}
-	return RequestTokenHasScope(c, "depot:"+bucketName+":read")
+	return RequestTokenHasScope(c, "depot:"+bucket.Name+":read")
 }
 
 func GetRequestToken(c *gin.Context) string {

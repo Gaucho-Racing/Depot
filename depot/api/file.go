@@ -40,27 +40,84 @@ func findFile(c *gin.Context, bucket model.Bucket) (model.File, bool) {
 	return file, true
 }
 
-func ListFiles(c *gin.Context) {
-	Require(c, RequestTokenCanReadBucket(c, c.Param("bucketName")))
+func parseListParams(c *gin.Context) (limit int, offset int, ok bool) {
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "100"))
+	if err != nil || limit < 1 || limit > 1000 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "limit must be an integer between 1 and 1000"})
+		return 0, 0, false
+	}
+	offset, err = strconv.Atoi(c.DefaultQuery("offset", "0"))
+	if err != nil || offset < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "offset must be a non-negative integer"})
+		return 0, 0, false
+	}
+	return limit, offset, true
+}
 
+func ListFiles(c *gin.Context) {
 	bucket, ok := findBucket(c)
 	if !ok {
 		return
 	}
+	Require(c, RequestTokenCanReadBucket(c, bucket))
 
-	limit, err := strconv.Atoi(c.DefaultQuery("limit", "100"))
-	if err != nil || limit < 1 || limit > 1000 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "limit must be an integer between 1 and 1000"})
-		return
-	}
-	offset, err := strconv.Atoi(c.DefaultQuery("offset", "0"))
-	if err != nil || offset < 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "offset must be a non-negative integer"})
+	limit, offset, ok := parseListParams(c)
+	if !ok {
 		return
 	}
 	status := model.FileStatus(c.DefaultQuery("status", string(model.FileStatusActive)))
 
-	files, err := service.ListFiles(bucket.ID, c.Query("path_prefix"), status, limit, offset)
+	files, err := service.ListFiles(service.FileQuery{
+		BucketIDs:  []string{bucket.ID},
+		PathPrefix: c.Query("path_prefix"),
+		Search:     c.Query("q"),
+		Status:     status,
+		Limit:      limit,
+		Offset:     offset,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, files)
+}
+
+func SearchFiles(c *gin.Context) {
+	Require(c, RequestTokenExists(c))
+
+	query := c.Query("q")
+	if query == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "q is required"})
+		return
+	}
+	limit, offset, ok := parseListParams(c)
+	if !ok {
+		return
+	}
+
+	buckets, err := service.GetAllBuckets()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	bucketIDs := []string{}
+	for _, bucket := range buckets {
+		if RequestTokenCanReadBucket(c, bucket) {
+			bucketIDs = append(bucketIDs, bucket.ID)
+		}
+	}
+	if len(bucketIDs) == 0 {
+		c.JSON(http.StatusOK, []model.File{})
+		return
+	}
+
+	files, err := service.ListFiles(service.FileQuery{
+		BucketIDs: bucketIDs,
+		Search:    query,
+		Status:    model.FileStatusActive,
+		Limit:     limit,
+		Offset:    offset,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -69,12 +126,11 @@ func ListFiles(c *gin.Context) {
 }
 
 func UploadFile(c *gin.Context) {
-	Require(c, RequestTokenCanWriteBucket(c, c.Param("bucketName")))
-
 	bucket, ok := findBucket(c)
 	if !ok {
 		return
 	}
+	Require(c, RequestTokenCanWriteBucket(c, bucket))
 
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, config.MaxProxyUploadBytesLimit)
 	formFile, err := c.FormFile("file")
@@ -132,6 +188,7 @@ func UploadFile(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	service.RecordAccess(created, model.AccessActionUpload, GetRequestTokenEntityID(c), false)
 	c.JSON(http.StatusCreated, created)
 }
 
@@ -144,9 +201,28 @@ func GetFile(c *gin.Context) {
 	if !ok {
 		return
 	}
-	Require(c, file.Public || RequestTokenCanReadBucket(c, bucket.Name))
+	Require(c, file.Public || RequestTokenCanReadBucket(c, bucket))
 
 	c.JSON(http.StatusOK, file)
+}
+
+func GetFileAccessLogs(c *gin.Context) {
+	bucket, ok := findBucket(c)
+	if !ok {
+		return
+	}
+	file, ok := findFile(c, bucket)
+	if !ok {
+		return
+	}
+	Require(c, RequestTokenCanReadBucket(c, bucket))
+
+	logs, err := service.ListFileAccessLogs(file.ID, 100)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, logs)
 }
 
 func GetFileContent(c *gin.Context) {
@@ -158,7 +234,7 @@ func GetFileContent(c *gin.Context) {
 	if !ok {
 		return
 	}
-	Require(c, file.Public || RequestTokenCanReadBucket(c, bucket.Name))
+	Require(c, file.Public || RequestTokenCanReadBucket(c, bucket))
 
 	if file.Status != model.FileStatusActive {
 		c.JSON(http.StatusConflict, gin.H{"error": "file upload has not been completed"})
@@ -176,18 +252,19 @@ func GetFileContent(c *gin.Context) {
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
+	service.RecordAccess(file, model.AccessActionDownload, GetRequestTokenEntityID(c), !RequestTokenExists(c))
 	c.DataFromReader(http.StatusOK, file.SizeBytes, contentType, body, map[string]string{
 		"Content-Disposition": fmt.Sprintf("inline; filename=%q", file.Name),
 	})
 }
 
 func UpdateFile(c *gin.Context) {
-	Require(c, RequestTokenCanWriteBucket(c, c.Param("bucketName")))
-
 	bucket, ok := findBucket(c)
 	if !ok {
 		return
 	}
+	Require(c, RequestTokenCanWriteBucket(c, bucket))
+
 	file, ok := findFile(c, bucket)
 	if !ok {
 		return
@@ -230,12 +307,12 @@ func UpdateFile(c *gin.Context) {
 }
 
 func DeleteFile(c *gin.Context) {
-	Require(c, RequestTokenCanWriteBucket(c, c.Param("bucketName")))
-
 	bucket, ok := findBucket(c)
 	if !ok {
 		return
 	}
+	Require(c, RequestTokenCanWriteBucket(c, bucket))
+
 	file, ok := findFile(c, bucket)
 	if !ok {
 		return
@@ -244,6 +321,7 @@ func DeleteFile(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	service.RecordAccess(file, model.AccessActionDelete, GetRequestTokenEntityID(c), false)
 	c.JSON(http.StatusOK, gin.H{"message": "file deleted"})
 }
 
@@ -256,7 +334,7 @@ func CreateDownloadURL(c *gin.Context) {
 	if !ok {
 		return
 	}
-	Require(c, file.Public || RequestTokenCanReadBucket(c, bucket.Name))
+	Require(c, file.Public || RequestTokenCanReadBucket(c, bucket))
 
 	if file.Status != model.FileStatusActive {
 		c.JSON(http.StatusConflict, gin.H{"error": "file upload has not been completed"})
@@ -268,6 +346,7 @@ func CreateDownloadURL(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	service.RecordAccess(file, model.AccessActionPresignDownload, GetRequestTokenEntityID(c), !RequestTokenExists(c))
 	c.JSON(http.StatusOK, gin.H{
 		"url":        request.URL,
 		"method":     request.Method,
@@ -276,12 +355,11 @@ func CreateDownloadURL(c *gin.Context) {
 }
 
 func InitiateUpload(c *gin.Context) {
-	Require(c, RequestTokenCanWriteBucket(c, c.Param("bucketName")))
-
 	bucket, ok := findBucket(c)
 	if !ok {
 		return
 	}
+	Require(c, RequestTokenCanWriteBucket(c, bucket))
 
 	var req struct {
 		Name        string            `json:"name"`
@@ -322,12 +400,12 @@ func InitiateUpload(c *gin.Context) {
 }
 
 func CompleteUpload(c *gin.Context) {
-	Require(c, RequestTokenCanWriteBucket(c, c.Param("bucketName")))
-
 	bucket, ok := findBucket(c)
 	if !ok {
 		return
 	}
+	Require(c, RequestTokenCanWriteBucket(c, bucket))
+
 	file, ok := findFile(c, bucket)
 	if !ok {
 		return
@@ -343,5 +421,6 @@ func CompleteUpload(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	service.RecordAccess(completed, model.AccessActionPresignUpload, GetRequestTokenEntityID(c), false)
 	c.JSON(http.StatusOK, completed)
 }

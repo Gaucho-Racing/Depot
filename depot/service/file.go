@@ -30,16 +30,29 @@ func GetFileByID(bucketID string, fileID string) (model.File, error) {
 	return file, nil
 }
 
-func ListFiles(bucketID string, pathPrefix string, status model.FileStatus, limit int, offset int) ([]model.File, error) {
+type FileQuery struct {
+	BucketIDs  []string
+	PathPrefix string
+	Search     string
+	Status     model.FileStatus
+	Limit      int
+	Offset     int
+}
+
+func ListFiles(q FileQuery) ([]model.File, error) {
 	files := []model.File{}
-	query := database.DB.Where("bucket_id = ?", bucketID)
-	if pathPrefix != "" {
-		query = query.Where("path LIKE ?", pathPrefix+"%")
+	query := database.DB.Where("bucket_id IN ?", q.BucketIDs)
+	if q.PathPrefix != "" {
+		query = query.Where("path LIKE ?", q.PathPrefix+"%")
 	}
-	if status != "" {
-		query = query.Where("status = ?", status)
+	if q.Search != "" {
+		pattern := "%" + q.Search + "%"
+		query = query.Where("name ILIKE ? OR path ILIKE ?", pattern, pattern)
 	}
-	if err := query.Order("created_at desc").Limit(limit).Offset(offset).Find(&files).Error; err != nil {
+	if q.Status != "" {
+		query = query.Where("status = ?", q.Status)
+	}
+	if err := query.Order("created_at desc").Limit(q.Limit).Offset(q.Offset).Find(&files).Error; err != nil {
 		return nil, err
 	}
 	return files, nil

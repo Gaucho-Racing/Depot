@@ -11,8 +11,9 @@ import (
 )
 
 type bucketRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	Name             string   `json:"name"`
+	Description      string   `json:"description"`
+	AccessGroupNames []string `json:"access_group_names"`
 }
 
 func ListBuckets(c *gin.Context) {
@@ -29,7 +30,7 @@ func ListBuckets(c *gin.Context) {
 	}
 	accessible := []model.Bucket{}
 	for _, bucket := range buckets {
-		if RequestTokenCanReadBucket(c, bucket.Name) {
+		if RequestTokenCanReadBucket(c, bucket) {
 			accessible = append(accessible, bucket)
 		}
 	}
@@ -52,6 +53,7 @@ func CreateBucket(c *gin.Context) {
 	bucket := model.Bucket{
 		Name:              req.Name,
 		Description:       req.Description,
+		AccessGroupNames:  req.AccessGroupNames,
 		CreatedByEntityID: GetRequestTokenEntityID(c),
 		UpdatedByEntityID: GetRequestTokenEntityID(c),
 	}
@@ -68,10 +70,7 @@ func CreateBucket(c *gin.Context) {
 }
 
 func GetBucket(c *gin.Context) {
-	bucketName := c.Param("bucketName")
-	Require(c, RequestTokenCanReadBucket(c, bucketName))
-
-	bucket, err := service.GetBucketByName(bucketName)
+	bucket, err := service.GetBucketByName(c.Param("bucketName"))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "bucket not found"})
@@ -80,6 +79,7 @@ func GetBucket(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	Require(c, RequestTokenCanReadBucket(c, bucket))
 	c.JSON(http.StatusOK, bucket)
 }
 
@@ -102,6 +102,7 @@ func UpdateBucket(c *gin.Context) {
 		return
 	}
 	bucket.Description = req.Description
+	bucket.AccessGroupNames = req.AccessGroupNames
 	bucket.UpdatedByEntityID = GetRequestTokenEntityID(c)
 
 	updated, err := service.UpdateBucket(bucket)
