@@ -61,7 +61,7 @@ services:
       - web_node_modules:/app/node_modules
     environment:
       VITE_API_URL: http://localhost:10320
-      VITE_SENTINEL_URL: https://sentinel-v5.gauchoracing.com
+      VITE_SENTINEL_URL: https://sso.gauchoracing.com
       VITE_SENTINEL_CLIENT_ID: ${DEPOT_SENTINEL_CLIENT_ID:-}
 
   db:
