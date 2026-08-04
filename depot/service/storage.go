@@ -1,34 +1,68 @@
 package service
 
 import (
-	"context"
-
 	"github.com/gaucho-racing/depot/depot/config"
+	"github.com/gaucho-racing/depot/depot/database"
+	"github.com/gaucho-racing/depot/depot/model"
 	"github.com/gaucho-racing/depot/depot/pkg/logger"
 	"github.com/gaucho-racing/depot/depot/pkg/storage"
+	ulid "github.com/gaucho-racing/ulid-go"
 )
 
+// Terminals are the source of truth for storage backends. On first boot the
+// table is seeded from the legacy S3_* env config under the name "s3" so
+// existing file rows (storage_backend = "s3") keep resolving.
 func InitializeStorage() {
-	switch config.StorageBackend {
-	case "s3":
-		backend, err := storage.NewS3Backend(context.Background(), storage.S3Config{
-			Bucket:          config.S3Bucket,
+	var count int64
+	if err := database.DB.Model(&model.Terminal{}).Count(&count).Error; err != nil {
+		logger.SugarLogger.Fatalf("failed to count storage terminals: %v", err)
+	}
+	if count == 0 {
+		if config.StorageBackend != "s3" || config.S3Bucket == "" {
+			logger.SugarLogger.Fatalf("no storage terminals configured and no seedable env config found")
+		}
+		provider := model.TerminalProviderAWSS3
+		if config.S3Endpoint != "" {
+			provider = model.TerminalProviderS3Compatible
+		}
+		seed := model.Terminal{
+			ID:              ulid.Make().Prefixed("term"),
+			Name:            "s3",
+			Provider:        provider,
 			Region:          config.S3Region,
+			Bucket:          config.S3Bucket,
 			Endpoint:        config.S3Endpoint,
+			ForcePathStyle:  config.S3ForcePathStyle == "true",
 			AccessKeyID:     config.S3AccessKeyID,
 			SecretAccessKey: config.S3SecretAccessKey,
-			ForcePathStyle:  config.S3ForcePathStyle == "true",
-		})
-		if err != nil {
-			logger.SugarLogger.Fatalf("failed to initialize s3 storage backend: %v", err)
+			Default:         true,
+			Enabled:         true,
 		}
-		storage.Register(backend)
-		logger.SugarLogger.Infof("Initialized s3 storage backend (bucket: %s)", config.S3Bucket)
-	default:
-		logger.SugarLogger.Fatalf("unknown storage backend: %s", config.StorageBackend)
+		if err := database.DB.Create(&seed).Error; err != nil {
+			logger.SugarLogger.Fatalf("failed to seed default storage terminal: %v", err)
+		}
+		logger.SugarLogger.Infof("Seeded default storage terminal %q from env config (bucket: %s)", seed.Name, seed.Bucket)
 	}
+
+	if err := RebuildStorageBackends(); err != nil {
+		logger.SugarLogger.Fatalf("failed to initialize storage backends: %v", err)
+	}
+	terminals, _ := ListTerminals()
+	enabled := 0
+	for _, terminal := range terminals {
+		if terminal.Enabled {
+			enabled++
+		}
+	}
+	logger.SugarLogger.Infof("Initialized %d storage terminal(s) (%d enabled)", len(terminals), enabled)
+
+	go RetryStalledReplicas()
 }
 
 func ActiveBackend() (storage.Backend, error) {
-	return storage.GetBackend(config.StorageBackend)
+	terminal, err := DefaultTerminal()
+	if err != nil {
+		return nil, err
+	}
+	return storage.GetBackend(terminal.Name)
 }

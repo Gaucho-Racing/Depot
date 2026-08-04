@@ -21,8 +21,9 @@ type File struct {
 	Status            FileStatus        `json:"status" gorm:"index"`
 	Public            bool              `json:"public"`
 	Tags              map[string]string `json:"tags" gorm:"type:jsonb;serializer:json"`
-	StorageBackend    string            `json:"-" gorm:"index"`
+	StorageBackend    string            `json:"terminal" gorm:"index"`
 	StorageKey        string            `json:"-"`
+	Replicas          []FileReplica     `json:"replicas" gorm:"-"`
 	CreatedByEntityID string            `json:"created_by_entity_id" gorm:"index"`
 	UpdatedByEntityID string            `json:"updated_by_entity_id" gorm:"index"`
 	CreatedAt         time.Time         `json:"created_at" gorm:"autoCreateTime"`

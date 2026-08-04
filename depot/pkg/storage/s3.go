@@ -16,6 +16,7 @@ import (
 )
 
 type S3Backend struct {
+	name     string
 	client   *s3.Client
 	presign  *s3.PresignClient
 	uploader *manager.Uploader
@@ -23,6 +24,7 @@ type S3Backend struct {
 }
 
 type S3Config struct {
+	Name            string
 	Bucket          string
 	Region          string
 	Endpoint        string
@@ -52,7 +54,12 @@ func NewS3Backend(ctx context.Context, cfg S3Config) (*S3Backend, error) {
 		o.UsePathStyle = cfg.ForcePathStyle
 	})
 
+	name := cfg.Name
+	if name == "" {
+		name = "s3"
+	}
 	return &S3Backend{
+		name:     name,
 		client:   client,
 		presign:  s3.NewPresignClient(client),
 		uploader: manager.NewUploader(client),
@@ -61,7 +68,7 @@ func NewS3Backend(ctx context.Context, cfg S3Config) (*S3Backend, error) {
 }
 
 func (b *S3Backend) Name() string {
-	return "s3"
+	return b.name
 }
 
 func (b *S3Backend) Put(ctx context.Context, key string, body io.Reader, contentType string) error {

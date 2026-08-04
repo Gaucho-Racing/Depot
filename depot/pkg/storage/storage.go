@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 )
 
@@ -29,18 +30,31 @@ type Backend interface {
 	PresignPut(ctx context.Context, key string, contentType string, expiry time.Duration) (PresignedRequest, error)
 }
 
-var backends = map[string]Backend{}
+var (
+	backendsMu sync.RWMutex
+	backends   = map[string]Backend{}
+)
 
 var ErrObjectNotFound = fmt.Errorf("object not found")
 
 func Register(backend Backend) {
+	backendsMu.Lock()
+	defer backendsMu.Unlock()
 	backends[backend.Name()] = backend
 }
 
+func ReplaceAll(next map[string]Backend) {
+	backendsMu.Lock()
+	defer backendsMu.Unlock()
+	backends = next
+}
+
 func GetBackend(name string) (Backend, error) {
+	backendsMu.RLock()
+	defer backendsMu.RUnlock()
 	backend, ok := backends[name]
 	if !ok {
-		return nil, fmt.Errorf("storage backend %q is not configured", name)
+		return nil, fmt.Errorf("storage terminal %q is not configured", name)
 	}
 	return backend, nil
 }

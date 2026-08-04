@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gaucho-racing/depot/depot/config"
 	"github.com/gaucho-racing/depot/depot/model"
@@ -38,6 +39,17 @@ func findFile(c *gin.Context, bucket model.Bucket) (model.File, bool) {
 		return model.File{}, false
 	}
 	return file, true
+}
+
+func splitTerminalNames(value string) []string {
+	names := []string{}
+	for _, part := range strings.Split(value, ",") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			names = append(names, part)
+		}
+	}
+	return names
 }
 
 func parseListParams(c *gin.Context) (limit int, offset int, ok bool) {
@@ -183,7 +195,7 @@ func UploadFile(c *gin.Context) {
 	}
 	defer body.Close()
 
-	created, err := service.UploadFile(c.Request.Context(), bucket, file, body)
+	created, err := service.UploadFile(c.Request.Context(), bucket, file, body, c.PostForm("terminal"), splitTerminalNames(c.PostForm("replicas")))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -367,6 +379,8 @@ func InitiateUpload(c *gin.Context) {
 		ContentType string            `json:"content_type"`
 		Public      bool              `json:"public"`
 		Tags        map[string]string `json:"tags"`
+		Terminal    string            `json:"terminal"`
+		Replicas    []string          `json:"replicas"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -386,7 +400,7 @@ func InitiateUpload(c *gin.Context) {
 		CreatedByEntityID: GetRequestTokenEntityID(c),
 		UpdatedByEntityID: GetRequestTokenEntityID(c),
 	}
-	created, request, err := service.InitiateUpload(c.Request.Context(), bucket, file)
+	created, request, err := service.InitiateUpload(c.Request.Context(), bucket, file, req.Terminal, req.Replicas)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

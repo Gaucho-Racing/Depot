@@ -54,6 +54,11 @@ func InitializeRoutes(router *gin.Engine) {
 	router.GET("/stats/activity", GetActivityStats)
 	router.GET("/files/search", SearchFiles)
 
+	router.GET("/terminals", ListTerminals)
+	router.POST("/terminals", CreateTerminal)
+	router.PATCH("/terminals/:terminalName", UpdateTerminal)
+	router.DELETE("/terminals/:terminalName", DeleteTerminal)
+
 	router.GET("/buckets", ListBuckets)
 	router.POST("/buckets", CreateBucket)
 	router.GET("/buckets/:bucketName", GetBucket)
