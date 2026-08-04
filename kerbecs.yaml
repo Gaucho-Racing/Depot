@@ -10,7 +10,7 @@ gateway:
 
 listeners:
   gateway:
-    port: "10320"
+    port: "10310"
     cors:
       enabled: true
       allowed_origins: ["*"]
@@ -31,7 +31,7 @@ upstreams:
     name: depot
     version: 0.1.0
     instances:
-      - http://depot:9993
+      - http://depot:9999
 
   web:
     name: depot-web

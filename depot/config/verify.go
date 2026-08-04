@@ -16,7 +16,7 @@ func Verify() {
 		logger.SugarLogger.Infof("ENV is not set, defaulting to %s", Env)
 	}
 	if Port == "" {
-		Port = "9993"
+		Port = "9999"
 		logger.SugarLogger.Infof("PORT is not set, defaulting to %s", Port)
 	}
 	if DatabaseHost == "" {
@@ -54,7 +54,7 @@ func Verify() {
 			logger.SugarLogger.Fatal("S3_BUCKET is required")
 		}
 		if S3Region == "" {
-			S3Region = "us-west-1"
+			S3Region = "us-west-2"
 			logger.SugarLogger.Infof("S3_REGION is not set, defaulting to %s", S3Region)
 		}
 	}
