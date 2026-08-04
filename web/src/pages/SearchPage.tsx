@@ -29,7 +29,7 @@ export default function SearchPage() {
 
   return (
     <PageContainer>
-      <PageHeader title="Search" description="Find files across every bucket you can access." />
+      <PageHeader title="Tracking" description="Trace cargo across every bay you have clearance for." />
 
       <form
         className="mb-6 flex h-12 max-w-2xl min-w-0 items-center gap-2 rounded-lg bg-card px-3 shadow-sm"
@@ -42,7 +42,7 @@ export default function SearchPage() {
         <Input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search by file name or path..."
+          placeholder="Enter a tracking query — file name or path..."
           className="h-10 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
           autoFocus
         />
@@ -50,7 +50,7 @@ export default function SearchPage() {
 
       {!submitted ? (
         <p className="py-10 text-center text-sm text-muted-foreground">
-          Type a query and press enter.
+          Scan the terminal — type a query and press enter.
         </p>
       ) : resultsQuery.isLoading ? (
         <div className="space-y-2">
@@ -60,7 +60,7 @@ export default function SearchPage() {
         </div>
       ) : results.length === 0 ? (
         <p className="py-10 text-center text-sm text-muted-foreground">
-          No files match "{submitted}".
+          No cargo on record matching "{submitted}".
         </p>
       ) : (
         <Card>

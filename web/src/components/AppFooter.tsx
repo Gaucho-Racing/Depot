@@ -1,29 +1,6 @@
-import { useEffect, useState } from "react"
-
 import { GithubIcon, InstagramIcon, LinkedinIcon, TwitterIcon } from "@/components/icons/socials"
-import { api } from "@/lib/api"
 import { SOCIAL_LINKS } from "@/lib/links"
-
-function useDepotVersion() {
-  const [version, setVersion] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    api
-      .get<{ message?: string }>("/ping")
-      .then((response) => {
-        if (cancelled) return
-        const match = response.data?.message?.match(/v([\d.]+)/)
-        if (match) setVersion(`v${match[1]}`)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  return version
-}
+import { dockLabel, useDepotStatus } from "@/lib/status"
 
 const socials = [
   { href: SOCIAL_LINKS.github, label: "GitHub", Icon: GithubIcon },
@@ -33,7 +10,7 @@ const socials = [
 ]
 
 export function AppFooter() {
-  const version = useDepotVersion()
+  const { version, env } = useDepotStatus()
 
   return (
     <footer className="mx-auto mt-16 w-full max-w-6xl px-4 py-8 lg:px-8">
@@ -42,8 +19,9 @@ export function AppFooter() {
           <img src="/logo/gr-logo-blank.png" alt="Gaucho Racing" className="size-12" />
           <span className="font-brand text-3xl font-bold tracking-tight">Gaucho Racing</span>
         </div>
-        <span className="font-mono text-xs text-muted-foreground">
-          depot{version ? ` · ${version}` : ""}
+        <span className="stencil text-xs text-muted-foreground">
+          Freight Terminal · {dockLabel(env)}
+          {version ? ` · ${version}` : ""}
         </span>
       </div>
 

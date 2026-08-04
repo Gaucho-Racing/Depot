@@ -3,6 +3,7 @@ import { CloudUpload } from "lucide-react"
 import { useRef, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 
+import { Truck } from "@/components/freight"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -64,10 +65,10 @@ export function UploadDialog({ trigger, bucket }: { trigger: ReactNode; bucket: 
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Upload file</DialogTitle>
+          <DialogTitle className="stencil">Inbound cargo</DialogTitle>
           <DialogDescription>
-            Upload into <span className="font-mono">{bucket}</span>. Files over 100MB should use
-            the presigned API flow.
+            Receiving into bay <span className="font-mono">{bucket}</span>. Freight over 100MB
+            should come through the presigned dock door (API flow).
           </DialogDescription>
         </DialogHeader>
 
@@ -87,21 +88,30 @@ export function UploadDialog({ trigger, bucket }: { trigger: ReactNode; bucket: 
               if (dropped) setFile(dropped)
             }}
             className={cn(
-              "flex w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-8 text-center transition-colors",
+              "w-full overflow-hidden rounded-lg border text-center transition-colors",
               dragging ? "border-gr-purple bg-accent" : "border-border hover:border-gr-purple/50",
             )}
           >
-            <CloudUpload className="size-6 text-muted-foreground" />
-            {file ? (
-              <div className="text-sm">
-                <span className="font-medium">{file.name}</span>
-                <span className="ml-2 text-xs text-muted-foreground">{formatBytes(file.size)}</span>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Drop a file here or click to browse
-              </p>
-            )}
+            <span className={cn("hazard-tape block h-2 w-full transition-opacity", dragging ? "opacity-100" : "opacity-50")} />
+            <span className="flex flex-col items-center justify-center gap-2 px-4 py-7">
+              <CloudUpload className="size-6 text-muted-foreground" />
+              {file ? (
+                <span className="text-sm">
+                  <span className="font-medium">{file.name}</span>
+                  <span className="ml-2 font-mono text-xs text-muted-foreground">
+                    WT {formatBytes(file.size)}
+                  </span>
+                </span>
+              ) : (
+                <>
+                  <span className="stencil text-sm text-muted-foreground">Dock door open</span>
+                  <span className="text-xs text-muted-foreground">
+                    Back cargo up here — drop a file or click to browse
+                  </span>
+                </>
+              )}
+            </span>
+            <span className={cn("hazard-tape block h-2 w-full transition-opacity", dragging ? "opacity-100" : "opacity-50")} />
           </button>
           <input
             ref={inputRef}
@@ -128,15 +138,24 @@ export function UploadDialog({ trigger, bucket }: { trigger: ReactNode; bucket: 
               onChange={(event) => setIsPublic(event.target.checked)}
               className="size-4 accent-(--color-gr-purple)"
             />
-            Publicly accessible (no auth required to download)
+            Public freight — anyone can download, no clearance required
           </label>
 
           {uploadMutation.isPending && (
-            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+            <div className="asphalt relative h-14 overflow-hidden rounded-md">
+              <div className="road-line absolute inset-x-0 top-1/2 h-0.5" />
+              <div className="hazard-tape absolute inset-y-0 right-0 w-2.5" />
               <div
-                className="h-full rounded-full bg-gradient-to-r from-gr-purple to-gr-pink transition-all"
-                style={{ width: `${progress}%` }}
-              />
+                className="absolute bottom-1 transition-all duration-500 ease-out"
+                style={{ left: `calc(${progress}% - ${Math.round(progress * 1.15)}px)` }}
+              >
+                <span className="block -scale-x-100">
+                  <Truck className="h-8 w-auto" />
+                </span>
+              </div>
+              <span className="stencil absolute left-2 top-1.5 text-[10px] text-white/80">
+                Backing in · {progress}%
+              </span>
             </div>
           )}
         </div>
@@ -155,7 +174,7 @@ export function UploadDialog({ trigger, bucket }: { trigger: ReactNode; bucket: 
             disabled={!file || uploadMutation.isPending}
             onClick={() => uploadMutation.mutate()}
           >
-            {uploadMutation.isPending ? `Uploading ${progress}%` : "Upload"}
+            {uploadMutation.isPending ? `Receiving ${progress}%` : "Receive"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts"
 
+import { YardStrip } from "@/components/freight"
 import { PageContainer, PageHeader } from "@/components/PageContainer"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -34,7 +35,7 @@ function StatTile({
           <Icon className="size-5" />
         </div>
         <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="stencil text-[10px] text-muted-foreground">{label}</p>
           {loading ? (
             <Skeleton className="mt-1 h-7 w-24" />
           ) : (
@@ -56,25 +57,27 @@ export default function DashboardPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Dashboard"
-        description="Storage usage and access activity across your buckets."
+        title="Terminal Ops"
+        description="Cargo on hand and dock activity across the terminal."
       />
+
+      <YardStrip className="mb-6" />
 
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
         <StatTile
-          label="Files"
+          label="Cargo on hand"
           value={String(stats?.total_files ?? 0)}
           icon={Files}
           loading={statsQuery.isLoading}
         />
         <StatTile
-          label="Storage used"
+          label="Gross tonnage"
           value={formatBytes(stats?.total_bytes ?? 0)}
           icon={HardDrive}
           loading={statsQuery.isLoading}
         />
         <StatTile
-          label="Buckets"
+          label="Bays open"
           value={String(stats?.total_buckets ?? 0)}
           icon={Boxes}
           loading={statsQuery.isLoading}
@@ -83,8 +86,8 @@ export default function DashboardPage() {
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Activity</CardTitle>
-          <CardDescription>Uploads and downloads over the last 30 days.</CardDescription>
+          <CardTitle className="stencil text-base">Freight volume</CardTitle>
+          <CardDescription>Inbound and outbound movements, last 30 days.</CardDescription>
         </CardHeader>
         <CardContent>
           {activityQuery.isLoading ? (
@@ -103,7 +106,7 @@ export default function DashboardPage() {
                       <stop offset="95%" stopColor="var(--chart-2)" stopOpacity={0.05} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <CartesianGrid stroke="var(--border)" vertical={false} />
                   <XAxis
                     dataKey="date"
                     tickLine={false}
@@ -150,15 +153,15 @@ export default function DashboardPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Storage by bucket</CardTitle>
-            <CardDescription>Active file bytes per bucket.</CardDescription>
+            <CardTitle className="stencil text-base">Bay utilization</CardTitle>
+            <CardDescription>Cargo weight on hand per bay.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {statsQuery.isLoading ? (
               Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-9 w-full" />)
             ) : (stats?.buckets ?? []).length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
-                No buckets with files yet.
+                No bays holding cargo yet.
               </p>
             ) : (
               stats?.buckets.map((bucket) => (
@@ -189,8 +192,8 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Top uploaders</CardTitle>
-            <CardDescription>Applications and users hosting the most files.</CardDescription>
+            <CardTitle className="stencil text-base">Top shippers</CardTitle>
+            <CardDescription>Applications and users moving the most freight.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             {statsQuery.isLoading ? (
@@ -201,7 +204,7 @@ export default function DashboardPage() {
               </div>
             ) : (stats?.top_uploaders ?? []).length === 0 ? (
               <p className="px-6 py-6 text-center text-sm text-muted-foreground">
-                Nothing uploaded yet.
+                No freight received yet.
               </p>
             ) : (
               <ul className="divide-y divide-border">
