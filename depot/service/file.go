@@ -89,41 +89,41 @@ func attachReplicasBatch(files []model.File) []model.File {
 	return files
 }
 
-// ResolveUploadTerminals validates the requested primary + replica terminal
-// names, falling back to the default terminal when no primary is named.
-func ResolveUploadTerminals(primaryName string, replicaNames []string) (model.Terminal, []model.Terminal, error) {
-	var primary model.Terminal
+// ResolveUploadBackends validates the requested primary + replica storage
+// backend names, falling back to the default backend when no primary is named.
+func ResolveUploadBackends(primaryName string, replicaNames []string) (model.StorageBackend, []model.StorageBackend, error) {
+	var primary model.StorageBackend
 	var err error
 	if primaryName == "" {
-		primary, err = DefaultTerminal()
+		primary, err = DefaultStorageBackend()
 		if err != nil {
-			return model.Terminal{}, nil, err
+			return model.StorageBackend{}, nil, err
 		}
 	} else {
-		primary, err = GetTerminalByName(primaryName)
+		primary, err = GetStorageBackendByName(primaryName)
 		if err != nil {
-			return model.Terminal{}, nil, fmt.Errorf("unknown terminal %q", primaryName)
+			return model.StorageBackend{}, nil, fmt.Errorf("unknown storage backend %q", primaryName)
 		}
 	}
 	if !primary.Enabled {
-		return model.Terminal{}, nil, fmt.Errorf("terminal %q is disabled", primary.Name)
+		return model.StorageBackend{}, nil, fmt.Errorf("storage backend %q is disabled", primary.Name)
 	}
 
 	seen := map[string]bool{primary.Name: true}
-	replicas := []model.Terminal{}
+	replicas := []model.StorageBackend{}
 	for _, name := range replicaNames {
 		if name == "" || seen[name] {
 			continue
 		}
-		terminal, err := GetTerminalByName(name)
+		backend, err := GetStorageBackendByName(name)
 		if err != nil {
-			return model.Terminal{}, nil, fmt.Errorf("unknown replica terminal %q", name)
+			return model.StorageBackend{}, nil, fmt.Errorf("unknown replica storage backend %q", name)
 		}
-		if !terminal.Enabled {
-			return model.Terminal{}, nil, fmt.Errorf("replica terminal %q is disabled", terminal.Name)
+		if !backend.Enabled {
+			return model.StorageBackend{}, nil, fmt.Errorf("replica storage backend %q is disabled", backend.Name)
 		}
 		seen[name] = true
-		replicas = append(replicas, terminal)
+		replicas = append(replicas, backend)
 	}
 	return primary, replicas, nil
 }
@@ -140,7 +140,7 @@ func (r *countingReader) Read(p []byte) (int, error) {
 }
 
 func UploadFile(ctx context.Context, bucket model.Bucket, file model.File, body io.Reader, primaryName string, replicaNames []string) (model.File, error) {
-	primary, replicaTerminals, err := ResolveUploadTerminals(primaryName, replicaNames)
+	primary, replicaBackends, err := ResolveUploadBackends(primaryName, replicaNames)
 	if err != nil {
 		return model.File{}, err
 	}
@@ -171,13 +171,13 @@ func UploadFile(ctx context.Context, bucket model.Bucket, file model.File, body 
 		return model.File{}, fmt.Errorf("failed to save file metadata: %w", err)
 	}
 
-	file.Replicas = createReplicaRows(file, replicaTerminals)
+	file.Replicas = createReplicaRows(file, replicaBackends)
 	go ReplicateFile(file)
 	return file, nil
 }
 
 func InitiateUpload(ctx context.Context, bucket model.Bucket, file model.File, primaryName string, replicaNames []string) (model.File, storage.PresignedRequest, error) {
-	primary, replicaTerminals, err := ResolveUploadTerminals(primaryName, replicaNames)
+	primary, replicaBackends, err := ResolveUploadBackends(primaryName, replicaNames)
 	if err != nil {
 		return model.File{}, storage.PresignedRequest{}, err
 	}
@@ -200,7 +200,7 @@ func InitiateUpload(ctx context.Context, bucket model.Bucket, file model.File, p
 	if err := database.DB.Create(&file).Error; err != nil {
 		return model.File{}, storage.PresignedRequest{}, fmt.Errorf("failed to save file metadata: %w", err)
 	}
-	file.Replicas = createReplicaRows(file, replicaTerminals)
+	file.Replicas = createReplicaRows(file, replicaBackends)
 	return file, request, nil
 }
 
@@ -232,18 +232,18 @@ func CompleteUpload(ctx context.Context, file model.File) (model.File, error) {
 	return file, nil
 }
 
-func createReplicaRows(file model.File, terminals []model.Terminal) []model.FileReplica {
-	replicas := make([]model.FileReplica, 0, len(terminals))
-	for _, terminal := range terminals {
+func createReplicaRows(file model.File, backends []model.StorageBackend) []model.FileReplica {
+	replicas := make([]model.FileReplica, 0, len(backends))
+	for _, backend := range backends {
 		replica := model.FileReplica{
-			ID:         ulid.Make().Prefixed("repl"),
-			FileID:     file.ID,
-			Terminal:   terminal.Name,
-			StorageKey: file.StorageKey,
-			Status:     model.ReplicaStatusPending,
+			ID:             ulid.Make().Prefixed("repl"),
+			FileID:         file.ID,
+			StorageBackend: backend.Name,
+			StorageKey:     file.StorageKey,
+			Status:         model.ReplicaStatusPending,
 		}
 		if err := database.DB.Create(&replica).Error; err != nil {
-			logger.SugarLogger.Errorf("failed to create replica row for file %s → %s: %v", file.ID, terminal.Name, err)
+			logger.SugarLogger.Errorf("failed to create replica row for file %s → %s: %v", file.ID, backend.Name, err)
 			continue
 		}
 		replicas = append(replicas, replica)
@@ -275,7 +275,7 @@ func ReplicateFile(file model.File) {
 	}
 
 	for _, replica := range replicas {
-		target, err := storage.GetBackend(replica.Terminal)
+		target, err := storage.GetBackend(replica.StorageBackend)
 		if err != nil {
 			markReplica(replica, model.ReplicaStatusFailed, err.Error())
 			continue
@@ -296,7 +296,7 @@ func ReplicateFile(file model.File) {
 			continue
 		}
 		markReplica(replica, model.ReplicaStatusActive, "")
-		logger.SugarLogger.Infof("Replicated file %s → terminal %s", file.ID, replica.Terminal)
+		logger.SugarLogger.Infof("Replicated file %s → storage backend %s", file.ID, replica.StorageBackend)
 	}
 }
 
@@ -307,7 +307,7 @@ func markReplica(replica model.FileReplica, status model.ReplicaStatus, errMessa
 		logger.SugarLogger.Errorf("failed to update replica %s: %v", replica.ID, err)
 	}
 	if status == model.ReplicaStatusFailed {
-		logger.SugarLogger.Errorf("Replication failed for file %s → terminal %s: %s", replica.FileID, replica.Terminal, errMessage)
+		logger.SugarLogger.Errorf("Replication failed for file %s → storage backend %s: %s", replica.FileID, replica.StorageBackend, errMessage)
 	}
 }
 
@@ -355,19 +355,19 @@ func DeleteFile(ctx context.Context, file model.File) error {
 			return fmt.Errorf("failed to delete file from storage: %w", err)
 		}
 	} else {
-		logger.SugarLogger.Errorf("primary terminal unavailable while deleting file %s: %v", file.ID, err)
+		logger.SugarLogger.Errorf("primary storage backend unavailable while deleting file %s: %v", file.ID, err)
 	}
 
 	replicas := []model.FileReplica{}
 	database.DB.Where("file_id = ?", file.ID).Find(&replicas)
 	for _, replica := range replicas {
-		target, err := storage.GetBackend(replica.Terminal)
+		target, err := storage.GetBackend(replica.StorageBackend)
 		if err != nil {
-			logger.SugarLogger.Errorf("replica terminal %s unavailable while deleting file %s", replica.Terminal, file.ID)
+			logger.SugarLogger.Errorf("replica storage backend %s unavailable while deleting file %s", replica.StorageBackend, file.ID)
 			continue
 		}
 		if err := target.Delete(ctx, replica.StorageKey); err != nil && err != storage.ErrObjectNotFound {
-			logger.SugarLogger.Errorf("failed to delete replica of file %s from %s: %v", file.ID, replica.Terminal, err)
+			logger.SugarLogger.Errorf("failed to delete replica of file %s from %s: %v", file.ID, replica.StorageBackend, err)
 		}
 	}
 	if err := database.DB.Where("file_id = ?", file.ID).Delete(&model.FileReplica{}).Error; err != nil {
@@ -393,13 +393,13 @@ func OpenFile(ctx context.Context, file model.File) (io.ReadCloser, error) {
 	}
 
 	for _, replica := range activeReplicas(file) {
-		target, targetErr := storage.GetBackend(replica.Terminal)
+		target, targetErr := storage.GetBackend(replica.StorageBackend)
 		if targetErr != nil {
 			continue
 		}
 		body, openErr := target.Get(ctx, replica.StorageKey)
 		if openErr == nil {
-			logger.SugarLogger.Warnf("Serving file %s from replica terminal %s (primary %s failed: %v)", file.ID, replica.Terminal, file.StorageBackend, err)
+			logger.SugarLogger.Warnf("Serving file %s from replica backend %s (primary %s failed: %v)", file.ID, replica.StorageBackend, file.StorageBackend, err)
 			return body, nil
 		}
 	}
@@ -413,11 +413,11 @@ func PresignDownload(ctx context.Context, file model.File) (storage.PresignedReq
 	}
 
 	for _, replica := range activeReplicas(file) {
-		target, targetErr := storage.GetBackend(replica.Terminal)
+		target, targetErr := storage.GetBackend(replica.StorageBackend)
 		if targetErr != nil {
 			continue
 		}
-		logger.SugarLogger.Warnf("Presigning file %s from replica terminal %s (primary %s unavailable)", file.ID, replica.Terminal, file.StorageBackend)
+		logger.SugarLogger.Warnf("Presigning file %s from replica backend %s (primary %s unavailable)", file.ID, replica.StorageBackend, file.StorageBackend)
 		return target.PresignGet(ctx, replica.StorageKey, expiryDuration())
 	}
 	return storage.PresignedRequest{}, err

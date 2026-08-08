@@ -32,11 +32,30 @@ func Init() {
 	}
 
 	logger.SugarLogger.Infoln("Connected to database")
+
+	// Renames from the terminal → storage backend nomenclature change;
+	// AutoMigrate can't rename, so handle existing dev databases explicitly.
+	if db.Migrator().HasTable("depot_terminal") && !db.Migrator().HasTable("depot_storage_backend") {
+		if err := db.Migrator().RenameTable("depot_terminal", "depot_storage_backend"); err != nil {
+			logger.SugarLogger.Fatalf("failed to rename depot_terminal: %v", err)
+		}
+	}
+	if db.Migrator().HasTable("depot_file_replica") && db.Migrator().HasColumn(&model.FileReplica{}, "terminal") {
+		if err := db.Migrator().RenameColumn(&model.FileReplica{}, "terminal", "storage_backend"); err != nil {
+			logger.SugarLogger.Fatalf("failed to rename depot_file_replica.terminal: %v", err)
+		}
+	}
+	if db.Migrator().HasIndex(&model.FileReplica{}, "idx_depot_file_replica_terminal") {
+		if err := db.Migrator().DropIndex(&model.FileReplica{}, "idx_depot_file_replica_terminal"); err != nil {
+			logger.SugarLogger.Errorf("failed to drop stale replica index: %v", err)
+		}
+	}
+
 	if err := db.AutoMigrate(
 		&model.Bucket{},
 		&model.File{},
 		&model.AccessLog{},
-		&model.Terminal{},
+		&model.StorageBackend{},
 		&model.FileReplica{},
 	); err != nil {
 		logger.SugarLogger.Fatalf("failed to run database migrations: %v", err)

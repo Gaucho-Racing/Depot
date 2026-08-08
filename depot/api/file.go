@@ -41,7 +41,7 @@ func findFile(c *gin.Context, bucket model.Bucket) (model.File, bool) {
 	return file, true
 }
 
-func splitTerminalNames(value string) []string {
+func splitBackendNames(value string) []string {
 	names := []string{}
 	for _, part := range strings.Split(value, ",") {
 		part = strings.TrimSpace(part)
@@ -195,7 +195,7 @@ func UploadFile(c *gin.Context) {
 	}
 	defer body.Close()
 
-	created, err := service.UploadFile(c.Request.Context(), bucket, file, body, c.PostForm("terminal"), splitTerminalNames(c.PostForm("replicas")))
+	created, err := service.UploadFile(c.Request.Context(), bucket, file, body, c.PostForm("storage_backend"), splitBackendNames(c.PostForm("replicas")))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -379,8 +379,8 @@ func InitiateUpload(c *gin.Context) {
 		ContentType string            `json:"content_type"`
 		Public      bool              `json:"public"`
 		Tags        map[string]string `json:"tags"`
-		Terminal    string            `json:"terminal"`
-		Replicas    []string          `json:"replicas"`
+		StorageBackend string         `json:"storage_backend"`
+		Replicas       []string       `json:"replicas"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -400,7 +400,7 @@ func InitiateUpload(c *gin.Context) {
 		CreatedByEntityID: GetRequestTokenEntityID(c),
 		UpdatedByEntityID: GetRequestTokenEntityID(c),
 	}
-	created, request, err := service.InitiateUpload(c.Request.Context(), bucket, file, req.Terminal, req.Replicas)
+	created, request, err := service.InitiateUpload(c.Request.Context(), bucket, file, req.StorageBackend, req.Replicas)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

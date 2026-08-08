@@ -11,14 +11,14 @@ const (
 )
 
 type FileReplica struct {
-	ID         string        `json:"id" gorm:"primaryKey"`
-	FileID     string        `json:"file_id" gorm:"index"`
-	Terminal   string        `json:"terminal" gorm:"index"`
-	StorageKey string        `json:"-"`
-	Status     ReplicaStatus `json:"status" gorm:"index"`
-	Error      string        `json:"error,omitempty"`
-	CreatedAt  time.Time     `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt  time.Time     `json:"updated_at" gorm:"autoUpdateTime"`
+	ID             string        `json:"id" gorm:"primaryKey"`
+	FileID         string        `json:"file_id" gorm:"index"`
+	StorageBackend string        `json:"storage_backend" gorm:"index;column:storage_backend"`
+	StorageKey     string        `json:"-"`
+	Status         ReplicaStatus `json:"status" gorm:"index"`
+	Error          string        `json:"error,omitempty"`
+	CreatedAt      time.Time     `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt      time.Time     `json:"updated_at" gorm:"autoUpdateTime"`
 }
 
 func (FileReplica) TableName() string {
