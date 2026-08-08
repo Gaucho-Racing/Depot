@@ -3,7 +3,6 @@ import { Download, Globe, Lock, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { ConfirmDialog } from "@/components/ConfirmDialog"
-import { Barcode, Stamp } from "@/components/freight"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -36,11 +35,11 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
 }
 
 const actionLabels: Record<string, string> = {
-  UPLOAD: "Received",
-  PRESIGN_UPLOAD: "Received at dock door",
-  DOWNLOAD: "Dispatched",
-  PRESIGN_DOWNLOAD: "Release slip issued",
-  DELETE: "Scrapped",
+  UPLOAD: "Uploaded",
+  PRESIGN_UPLOAD: "Uploaded (presigned)",
+  DOWNLOAD: "Downloaded",
+  PRESIGN_DOWNLOAD: "Download link issued",
+  DELETE: "Deleted",
 }
 
 export function FileSheet({
@@ -98,31 +97,20 @@ export function FileSheet({
       <SheetContent className="w-full overflow-y-auto sm:max-w-md">
         {file && (
           <>
-            <div className="hazard-tape h-2 w-full shrink-0" />
             <SheetHeader>
-              <p className="stencil text-[10px] text-muted-foreground">
-                Cargo tag · GR Freight Terminal
-              </p>
               <SheetTitle className="break-all font-mono text-base">{file.name}</SheetTitle>
-              <SheetDescription className="flex items-center gap-3">
+              <SheetDescription className="flex items-center gap-2">
                 {file.public ? (
-                  <Stamp className="text-gr-purple">
-                    <Globe className="mr-1 inline size-2.5" />
-                    Public freight
-                  </Stamp>
+                  <Badge className="bg-gr-purple">
+                    <Globe className="size-3" /> Public
+                  </Badge>
                 ) : (
-                  <Stamp className="text-muted-foreground">
-                    <Lock className="mr-1 inline size-2.5" />
-                    Sealed
-                  </Stamp>
+                  <Badge variant="secondary">
+                    <Lock className="size-3" /> Private
+                  </Badge>
                 )}
+                <span className="font-mono text-xs">{file.id}</span>
               </SheetDescription>
-              <div className="pt-1">
-                <Barcode value={file.id} />
-                <p className="mt-1 font-mono text-[10px] tracking-wider text-muted-foreground">
-                  {file.id}
-                </p>
-              </div>
             </SheetHeader>
 
             <div className="space-y-4 px-4 pb-6">
@@ -164,19 +152,55 @@ export function FileSheet({
 
               <div>
                 <Row label="Path" value={file.path} mono />
-                <Row label="Class" value={file.content_type} />
-                <Row label="Weight" value={formatBytes(file.size_bytes)} />
-                <Row label="Seal" value={file.checksum} mono />
-                <Row label="Shipper" value={file.created_by_entity_id} mono />
-                <Row label="Received" value={new Date(file.created_at).toLocaleString()} />
-                <Row label="Last handled" value={new Date(file.updated_at).toLocaleString()} />
+                <Row label="Content type" value={file.content_type} />
+                <Row label="Size" value={formatBytes(file.size_bytes)} />
+                <Row label="Checksum" value={file.checksum} mono />
+                <Row label="Storage backend" value={file.storage_backend} mono />
+                <Row label="Uploaded by" value={file.created_by_entity_id} mono />
+                <Row label="Created" value={new Date(file.created_at).toLocaleString()} />
+                <Row label="Updated" value={new Date(file.updated_at).toLocaleString()} />
               </div>
+
+              {(file.replicas ?? []).length > 0 && (
+                <>
+                  <Separator />
+                  <div>
+                    <p className="mb-2 text-sm font-medium">Replicas</p>
+                    <ul className="space-y-1.5">
+                      {file.replicas.map((replica) => (
+                        <li key={replica.id} className="flex items-center justify-between gap-3 text-xs">
+                          <span className="min-w-0 truncate font-mono">{replica.storage_backend}</span>
+                          <span className="flex items-center gap-2">
+                            {replica.status === "FAILED" && replica.error && (
+                              <span className="max-w-48 truncate text-muted-foreground" title={replica.error}>
+                                {replica.error}
+                              </span>
+                            )}
+                            <Badge
+                              variant={replica.status === "ACTIVE" ? "secondary" : "outline"}
+                              className={
+                                replica.status === "FAILED"
+                                  ? "border-destructive/50 text-destructive"
+                                  : replica.status === "PENDING"
+                                    ? "text-muted-foreground"
+                                    : undefined
+                              }
+                            >
+                              {replica.status}
+                            </Badge>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              )}
 
               {file.tags && Object.keys(file.tags).length > 0 && (
                 <>
                   <Separator />
                   <div>
-                    <p className="stencil mb-2 text-xs text-muted-foreground">Cargo tags</p>
+                    <p className="mb-2 text-sm font-medium">Tags</p>
                     <div className="flex flex-wrap gap-1.5">
                       {Object.entries(file.tags).map(([key, value]) => (
                         <Badge key={key} variant="outline" className="font-mono text-xs">
@@ -191,11 +215,11 @@ export function FileSheet({
               <Separator />
 
               <div>
-                <p className="stencil mb-2 text-xs text-muted-foreground">Movement record</p>
+                <p className="mb-2 text-sm font-medium">Recent activity</p>
                 {logsQuery.isLoading ? (
-                  <p className="text-xs text-muted-foreground">Pulling the ledger...</p>
+                  <p className="text-xs text-muted-foreground">Loading...</p>
                 ) : (logsQuery.data ?? []).length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No recorded movements.</p>
+                  <p className="text-xs text-muted-foreground">No recorded activity.</p>
                 ) : (
                   <ul className="space-y-2">
                     {(logsQuery.data ?? []).slice(0, 20).map((log) => (

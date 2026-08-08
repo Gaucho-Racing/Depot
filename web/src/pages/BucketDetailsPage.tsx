@@ -83,7 +83,7 @@ export default function BucketDetailsPage() {
     <PageContainer>
       <PageHeader
         title={bucketName}
-        description={bucket?.description || "Cargo on record in this bay."}
+        description={bucket?.description || "Bucket files"}
         action={
           <div className="flex gap-2">
             {isAdmin && bucket && (
@@ -111,9 +111,9 @@ export default function BucketDetailsPage() {
                       <span className="sr-only">Delete bucket</span>
                     </Button>
                   }
-                  title={`Close bay ${bucketName}?`}
-                  description="A bay can only be closed once all cargo is cleared out."
-                  confirmLabel="Close bay"
+                  title={`Delete ${bucketName}?`}
+                  description="Buckets can only be deleted when empty."
+                  confirmLabel="Delete bucket"
                   isPending={deleteMutation.isPending}
                   onConfirm={async () => {
                     await deleteMutation.mutateAsync()
@@ -126,7 +126,7 @@ export default function BucketDetailsPage() {
                 trigger={
                   <Button>
                     <Upload className="size-4" />
-                    Receive cargo
+                    Upload
                   </Button>
                 }
                 bucket={bucketName}
@@ -137,12 +137,9 @@ export default function BucketDetailsPage() {
       />
 
       {bucket && (
-        <div className="mb-6 flex flex-wrap items-center gap-1.5">
-          <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-            Clearance
-          </span>
+        <div className="mb-6 flex flex-wrap gap-1.5">
           {(bucket.access_group_names ?? []).length === 0 ? (
-            <Badge variant="secondary">Restricted</Badge>
+            <Badge variant="secondary">Scoped access</Badge>
           ) : (
             (bucket.access_group_names ?? []).map((group) => (
               <Badge key={group} variant="outline">
@@ -158,7 +155,7 @@ export default function BucketDetailsPage() {
         <Input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Scan the manifest — name or path"
+          placeholder="Search files by name or path"
           className="h-9 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
         />
       </div>
@@ -172,22 +169,16 @@ export default function BucketDetailsPage() {
       ) : files.length === 0 ? (
         <Card>
           <CardContent className="flex min-h-56 flex-col items-center justify-center py-10 text-center">
-            <div className="flex size-10 items-center justify-center rounded-md bg-muted">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
               <FileIcon className="size-5 text-muted-foreground" />
             </div>
-            <div className="stencil mt-4 text-sm">
-              {search ? "Nothing on the manifest matches" : "Bay empty — no cargo on record"}
+            <div className="mt-4 text-sm font-medium">
+              {search ? "No files match your search" : "No files in this bucket yet"}
             </div>
           </CardContent>
         </Card>
       ) : (
-        <Card className="gap-0 overflow-hidden py-0">
-          <div className="flex items-center justify-between border-b border-border bg-muted/40 px-4 py-2">
-            <span className="stencil text-[11px] text-muted-foreground">Manifest</span>
-            <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
-              {files.length} item{files.length === 1 ? "" : "s"}
-            </span>
-          </div>
+        <Card>
           <CardContent className="p-0">
             <ul className="divide-y divide-border">
               {files.map((file) => (

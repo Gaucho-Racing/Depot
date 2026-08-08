@@ -76,30 +76,19 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-svh items-center justify-center px-4 py-12">
-      <div className="w-full max-w-sm overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-        <div className="hazard-tape h-2 w-full" />
-        <div className="space-y-5 px-6 py-8 text-center">
-          <div>
-            <p className="stencil text-xl">Security Checkpoint</p>
-            <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.22em] text-muted-foreground">
-              GR Freight Terminal · Dock 9999
-            </p>
+      <div className="w-full max-w-sm space-y-5 text-center">
+        {loading && (
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="size-8 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Redirecting to Sentinel...</p>
           </div>
+        )}
 
-          {loading && (
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 className="size-8 animate-spin text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Verifying credentials with Sentinel...</p>
-            </div>
-          )}
-
-          {!loading && (searchParams.get("error") || errorMessage) && (
-            <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {errorMessage || "Sentinel sign-on failed. Please try again."}
-            </div>
-          )}
-        </div>
-        <div className="hazard-tape h-2 w-full" />
+        {!loading && (searchParams.get("error") || errorMessage) && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {errorMessage || "Sentinel sign-on failed. Please try again."}
+          </div>
+        )}
       </div>
     </main>
   )

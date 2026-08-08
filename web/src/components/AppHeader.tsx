@@ -1,4 +1,4 @@
-import { Container, Gauge, LogOut, Menu, ScanBarcode, Settings, Warehouse } from "lucide-react"
+import { Container, Database, LayoutDashboard, LogOut, Menu, Package, Search, Settings } from "lucide-react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -16,18 +16,20 @@ import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
 
 const mobileItems = [
-  { to: "/dashboard", label: "Terminal", icon: Gauge },
-  { to: "/buckets", label: "Bays", icon: Warehouse },
-  { to: "/search", label: "Tracking", icon: ScanBarcode },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/buckets", label: "Buckets", icon: Package },
+  { to: "/search", label: "Search", icon: Search },
+  { to: "/storage-backends", label: "Storage Backends", icon: Database },
   { to: "/settings", label: "Settings", icon: Settings },
 ]
 
 function sectionTitle(pathname: string) {
   if (pathname.startsWith("/settings")) return "Settings"
-  if (pathname.startsWith("/search")) return "Tracking"
-  if (pathname.startsWith("/buckets")) return "Storage Bays"
-  if (pathname.startsWith("/dashboard")) return "Terminal Ops"
-  return "The Depot"
+  if (pathname.startsWith("/storage-backends")) return "Storage Backends"
+  if (pathname.startsWith("/search")) return "Search"
+  if (pathname.startsWith("/buckets")) return "Buckets"
+  if (pathname.startsWith("/dashboard")) return "Dashboard"
+  return "Depot"
 }
 
 function initials(name: string) {
@@ -74,7 +76,7 @@ function HeaderUserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={logout} className="text-destructive focus:text-destructive">
           <LogOut className="size-4" />
-          Clock out
+          Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -95,7 +97,7 @@ export function AppHeader() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-52">
-          <DropdownMenuLabel className="stencil">The Depot</DropdownMenuLabel>
+          <DropdownMenuLabel>Depot</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {mobileItems.map((item) => (
             <DropdownMenuItem key={item.to} asChild>
@@ -112,14 +114,14 @@ export function AppHeader() {
       </DropdownMenu>
 
       <Link to="/dashboard" className="flex items-center gap-2 lg:hidden">
-        <div className="flex size-8 items-center justify-center rounded-md bg-gradient-to-br from-gr-purple to-gr-pink text-primary-foreground shadow-sm shadow-primary/20">
+        <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-gr-purple to-gr-pink text-primary-foreground shadow-sm shadow-primary/20">
           <Container className="size-4" />
         </div>
-        <span className="stencil text-sm">The Depot</span>
+        <span className="text-sm font-semibold">Depot</span>
       </Link>
 
       <div className="hidden min-w-0 lg:block">
-        <div className="stencil text-lg leading-none">{section}</div>
+        <div className="text-lg font-semibold leading-none">{section}</div>
       </div>
 
       <div className="flex-1" />

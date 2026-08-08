@@ -23,7 +23,7 @@ export function useDepotStatus(): DepotStatus {
   return data ?? { version: null, env: null }
 }
 
-export function dockLabel(env: string | null) {
-  if (!env) return "Dock offline"
-  return env.toUpperCase() === "PROD" ? "Production dock" : "Development dock"
+export function envLabel(env: string | null) {
+  if (!env) return null
+  return env.toUpperCase() === "PROD" ? "Production" : "Development"
 }

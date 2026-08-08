@@ -12,7 +12,7 @@ export default function SettingsPage() {
 
   return (
     <PageContainer>
-      <PageHeader title="Settings" description="Front office — appearance and your worker badge." />
+      <PageHeader title="Settings" description="Appearance and account details." />
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
@@ -30,8 +30,8 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Worker badge</CardTitle>
-            <CardDescription>Issued by Sentinel at the security checkpoint.</CardDescription>
+            <CardTitle>Account</CardTitle>
+            <CardDescription>Signed in through Sentinel.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
             <p>

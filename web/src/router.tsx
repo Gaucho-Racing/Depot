@@ -9,6 +9,7 @@ import LoginPage from "@/pages/LoginPage"
 import NotFoundPage from "@/pages/NotFoundPage"
 import SearchPage from "@/pages/SearchPage"
 import SettingsPage from "@/pages/SettingsPage"
+import StorageBackendsPage from "@/pages/StorageBackendsPage"
 
 export const router = createBrowserRouter([
   {
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
           { path: "/buckets", element: <BucketsPage /> },
           { path: "/buckets/:bucketName", element: <BucketDetailsPage /> },
           { path: "/search", element: <SearchPage /> },
+          { path: "/storage-backends", element: <StorageBackendsPage /> },
           { path: "/settings", element: <SettingsPage /> },
         ],
       },

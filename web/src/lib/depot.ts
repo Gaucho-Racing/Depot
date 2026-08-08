@@ -11,6 +11,16 @@ export type Bucket = {
   updated_at: string
 }
 
+export type FileReplica = {
+  id: string
+  file_id: string
+  storage_backend: string
+  status: "PENDING" | "ACTIVE" | "FAILED"
+  error?: string
+  created_at: string
+  updated_at: string
+}
+
 export type DepotFile = {
   id: string
   bucket_id: string
@@ -23,10 +33,50 @@ export type DepotFile = {
   status: "PENDING" | "ACTIVE"
   public: boolean
   tags: Record<string, string> | null
+  storage_backend: string
+  replicas: FileReplica[]
   created_by_entity_id: string
   updated_by_entity_id: string
   created_at: string
   updated_at: string
+}
+
+export type StorageProvider = "aws-s3" | "s3-compatible"
+
+export type StorageBackend = {
+  id: string
+  name: string
+  provider: StorageProvider
+  region: string
+  bucket: string
+  endpoint: string
+  force_path_style: boolean
+  default: boolean
+  enabled: boolean
+  created_by_entity_id: string
+  updated_by_entity_id: string
+  created_at: string
+  updated_at: string
+}
+
+export type ProviderRegions = {
+  provider: StorageProvider
+  regions: string[]
+  allows_custom: boolean
+  region_required: boolean
+}
+
+export type StorageBackendInput = {
+  name?: string
+  provider?: StorageProvider
+  region?: string
+  bucket?: string
+  endpoint?: string
+  force_path_style?: boolean
+  access_key_id?: string
+  secret_access_key?: string
+  default?: boolean
+  enabled?: boolean
 }
 
 export type AccessLog = {
@@ -80,6 +130,30 @@ export type BucketInput = {
   name: string
   description: string
   access_group_names: string[]
+}
+
+export async function listStorageBackends() {
+  const response = await api.get<StorageBackend[]>("/storage-backends")
+  return response.data
+}
+
+export async function listStorageProviders() {
+  const response = await api.get<ProviderRegions[]>("/storage-backends/providers")
+  return response.data
+}
+
+export async function createStorageBackend(input: StorageBackendInput) {
+  const response = await api.post<StorageBackend>("/storage-backends", input)
+  return response.data
+}
+
+export async function updateStorageBackend(name: string, input: StorageBackendInput) {
+  const response = await api.patch<StorageBackend>(`/storage-backends/${encodeURIComponent(name)}`, input)
+  return response.data
+}
+
+export async function deleteStorageBackend(name: string) {
+  await api.delete(`/storage-backends/${encodeURIComponent(name)}`)
 }
 
 export async function listBuckets() {
