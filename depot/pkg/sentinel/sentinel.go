@@ -47,6 +47,14 @@ type User struct {
 	CreatedAt   string   `json:"created_at"`
 }
 
+type Application struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	ClientID    string `json:"client_id"`
+	IconURL     string `json:"icon_url"`
+}
+
 type Group struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -193,6 +201,48 @@ func GetGroups(accessToken string) ([]Group, error) {
 		return []Group{}, err
 	}
 	return groups, nil
+}
+
+// GetApplications lists every Sentinel application. Requires the caller's
+// token to carry applications:read, which Depot's web client requests at login.
+func GetApplications(accessToken string) ([]Application, error) {
+	if strings.TrimSpace(config.SentinelURL) == "" {
+		return []Application{}, fmt.Errorf("SENTINEL_URL is not configured")
+	}
+	if strings.TrimSpace(accessToken) == "" {
+		return []Application{}, fmt.Errorf("access token is required")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, strings.TrimRight(config.SentinelURL, "/")+"/api/applications", nil)
+	if err != nil {
+		return []Application{}, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return []Application{}, err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return []Application{}, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		var sentinelErr Error
+		if err := json.Unmarshal(respBody, &sentinelErr); err == nil && sentinelErr.Message != "" {
+			sentinelErr.Code = resp.StatusCode
+			return []Application{}, sentinelErr
+		}
+		return []Application{}, Error{Code: resp.StatusCode, Message: strings.TrimSpace(string(respBody))}
+	}
+
+	applications := []Application{}
+	if err := json.Unmarshal(respBody, &applications); err != nil {
+		return []Application{}, err
+	}
+	return applications, nil
 }
 
 func exchangeToken(form url.Values) (TokenResponse, error) {

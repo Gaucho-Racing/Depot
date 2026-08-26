@@ -46,16 +46,11 @@ export default function BucketDetailsPage() {
     queryFn: () => listFiles(bucketName, { q: search || undefined, limit: 200 }),
   })
 
-  const canWrite =
-    isAdmin ||
-    (bucketQuery.data?.access_group_names ?? []).some((group) => user?.groups?.includes(group))
+  const canWrite = isAdmin
 
   const updateMutation = useMutation({
-    mutationFn: (input: {
-      description: string
-      access_group_names: string[]
-      allow_public_files: boolean
-    }) => updateBucket(bucketName, input),
+    mutationFn: (input: { description: string; allow_public_files: boolean }) =>
+      updateBucket(bucketName, input),
     onSuccess: () => {
       toast.success("Bucket updated")
       void queryClient.invalidateQueries({ queryKey: ["bucket", bucketName] })
@@ -104,7 +99,6 @@ export default function BucketDetailsPage() {
                   onSubmit={async (input) => {
                     await updateMutation.mutateAsync({
                       description: input.description,
-                      access_group_names: input.access_group_names,
                       allow_public_files: input.allow_public_files,
                     })
                   }}
@@ -142,22 +136,11 @@ export default function BucketDetailsPage() {
         }
       />
 
-      {bucket && (
+      {bucket?.allow_public_files && (
         <div className="mb-6 flex flex-wrap gap-1.5">
-          {(bucket.access_group_names ?? []).length === 0 ? (
-            <Badge variant="secondary">Scoped access</Badge>
-          ) : (
-            (bucket.access_group_names ?? []).map((group) => (
-              <Badge key={group} variant="outline">
-                {group}
-              </Badge>
-            ))
-          )}
-          {bucket.allow_public_files && (
-            <Badge variant="outline" className="border-gr-purple text-gr-purple">
-              <Globe className="size-3" /> Public files allowed
-            </Badge>
-          )}
+          <Badge variant="outline" className="border-gr-purple text-gr-purple">
+            <Globe className="size-3" /> Public files allowed
+          </Badge>
         </div>
       )}
 

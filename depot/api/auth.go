@@ -84,6 +84,17 @@ func ListSentinelGroups(c *gin.Context) {
 	c.JSON(http.StatusOK, groups)
 }
 
+func ListSentinelApplications(c *gin.Context) {
+	Require(c, RequestTokenIsAdmin(c))
+
+	applications, err := sentinel.GetApplications(GetRequestToken(c))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, applications)
+}
+
 func callbackURL(c *gin.Context) string {
 	if config.SentinelRedirectURI != "" {
 		return config.SentinelRedirectURI

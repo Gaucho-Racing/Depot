@@ -1,7 +1,5 @@
-import { useQuery } from "@tanstack/react-query"
 import { useState, type ReactNode } from "react"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -15,8 +13,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { listSentinelGroups, type Bucket, type BucketInput } from "@/lib/depot"
-import { cn } from "@/lib/utils"
+import { type Bucket, type BucketInput } from "@/lib/depot"
 
 export function BucketFormDialog({
   trigger,
@@ -32,37 +29,19 @@ export function BucketFormDialog({
   const [open, setOpen] = useState(false)
   const [name, setName] = useState(bucket?.name ?? "")
   const [description, setDescription] = useState(bucket?.description ?? "")
-  const [groups, setGroups] = useState<string[]>(bucket?.access_group_names ?? [])
   const [allowPublicFiles, setAllowPublicFiles] = useState(bucket?.allow_public_files ?? false)
-
-  const groupsQuery = useQuery({
-    queryKey: ["sentinelGroups"],
-    queryFn: listSentinelGroups,
-    enabled: open,
-    staleTime: 5 * 60 * 1000,
-  })
-
-  function toggleGroup(groupName: string) {
-    setGroups((current) =>
-      current.includes(groupName)
-        ? current.filter((g) => g !== groupName)
-        : [...current, groupName],
-    )
-  }
 
   async function handleSubmit() {
     try {
       await onSubmit({
         name: name.trim(),
         description: description.trim(),
-        access_group_names: groups,
         allow_public_files: allowPublicFiles,
       })
       setOpen(false)
       if (!bucket) {
         setName("")
         setDescription("")
-        setGroups([])
         setAllowPublicFiles(false)
       }
     } catch {
@@ -78,7 +57,7 @@ export function BucketFormDialog({
           <DialogTitle>{bucket ? `Edit ${bucket.name}` : "New bucket"}</DialogTitle>
           <DialogDescription>
             {bucket
-              ? "Update the bucket description and access groups."
+              ? "Update the bucket description and public file policy. Manage application access from the bucket page."
               : "Buckets namespace files per application or team."}
           </DialogDescription>
         </DialogHeader>
@@ -111,32 +90,6 @@ export function BucketFormDialog({
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Access groups</Label>
-            <p className="text-xs text-muted-foreground">
-              Members of these Sentinel groups can read and write this bucket. Leave empty to
-              restrict access to admins and service scopes.
-            </p>
-            <div className="flex max-h-36 flex-wrap gap-1.5 overflow-y-auto">
-              {groupsQuery.isLoading ? (
-                <span className="text-xs text-muted-foreground">Loading groups...</span>
-              ) : (
-                (groupsQuery.data ?? []).map((group) => {
-                  const selected = groups.includes(group.name)
-                  return (
-                    <button key={group.id} type="button" onClick={() => toggleGroup(group.name)}>
-                      <Badge
-                        variant={selected ? "default" : "outline"}
-                        className={cn("cursor-pointer", selected && "bg-gr-purple")}
-                      >
-                        {group.name}
-                      </Badge>
-                    </button>
-                  )
-                })
-              )}
-            </div>
-          </div>
           <div className="space-y-2">
             <Label>Public files</Label>
             <label className="flex items-start gap-2 text-sm">

@@ -20,9 +20,8 @@ func (a BucketAccess) AllowsRead() bool {
 }
 
 // BucketGrant authorizes one application (by Sentinel client_id) against one
-// bucket. Grants are the only path a non-first-party token has to a bucket's
-// files: Bucket.AccessGroupNames gates humans signed in through Depot's own
-// OAuth client, grants gate everything else.
+// bucket. Grants are the only path any caller other than a Depot admin has to
+// a bucket's files.
 type BucketGrant struct {
 	ID                string       `json:"id" gorm:"primaryKey"`
 	BucketID          string       `json:"bucket_id" gorm:"index;uniqueIndex:idx_depot_bucket_grant_bucket_client"`

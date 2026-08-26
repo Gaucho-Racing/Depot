@@ -50,6 +50,7 @@ func InitializeRoutes(router *gin.Engine) {
 	router.POST("/auth/logout", Logout)
 	router.GET("/users/@me", GetCurrentUser)
 	router.GET("/groups", ListSentinelGroups)
+	router.GET("/applications", ListSentinelApplications)
 
 	router.GET("/stats", GetStats)
 	router.GET("/stats/activity", GetActivityStats)
@@ -203,20 +204,10 @@ func RequestTokenIsAdmin(c *gin.Context) bool {
 	return RequestTokenIsFirstParty(c) && RequestTokenHasGroupName(c, "Admins")
 }
 
-func RequestTokenHasAnyGroupName(c *gin.Context, groupNames []string) bool {
-	for _, groupName := range groupNames {
-		if RequestTokenHasGroupName(c, groupName) {
-			return true
-		}
-	}
-	return false
-}
-
 // RequestTokenCanReadBucket and RequestTokenCanUploadToBucket are the data
-// plane. First-party tokens resolve against the bucket's Sentinel groups;
-// everything else resolves against the bucket's application grants. The two
-// paths never mix, so a user's group membership cannot leak bucket access to
-// whichever application happened to mint their token.
+// plane. Depot admins reach every bucket; every other caller is an application
+// and needs an explicit grant. There is deliberately no group tier here —
+// Sentinel groups gate administering Depot, not the files inside a bucket.
 func RequestTokenCanReadBucket(c *gin.Context, bucket model.Bucket) bool {
 	if !RequestTokenExists(c) {
 		return false
@@ -225,7 +216,7 @@ func RequestTokenCanReadBucket(c *gin.Context, bucket model.Bucket) bool {
 		return true
 	}
 	if RequestTokenIsFirstParty(c) {
-		return RequestTokenHasAnyGroupName(c, bucket.AccessGroupNames)
+		return false
 	}
 	return service.ClientCanReadBucket(bucket.ID, GetRequestTokenClientID(c))
 }
@@ -238,7 +229,7 @@ func RequestTokenCanUploadToBucket(c *gin.Context, bucket model.Bucket) bool {
 		return true
 	}
 	if RequestTokenIsFirstParty(c) {
-		return RequestTokenHasAnyGroupName(c, bucket.AccessGroupNames)
+		return false
 	}
 	return service.ClientCanWriteBucket(bucket.ID, GetRequestTokenClientID(c))
 }

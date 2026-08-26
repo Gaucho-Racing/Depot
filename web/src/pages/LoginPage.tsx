@@ -7,7 +7,7 @@ import { clearSession, saveSession } from "@/lib/auth"
 
 const sentinelURL = import.meta.env.VITE_SENTINEL_URL ?? "https://sso.gauchoracing.com"
 const sentinelClientID = import.meta.env.VITE_SENTINEL_CLIENT_ID ?? ""
-const oauthScope = "user:read groups:read"
+const oauthScope = "user:read groups:read applications:read"
 
 type TokenResponse = {
   access_token: string

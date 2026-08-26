@@ -4,7 +4,6 @@ export type Bucket = {
   id: string
   name: string
   description: string
-  access_group_names: string[] | null
   allow_public_files: boolean
   created_by_entity_id: string
   updated_by_entity_id: string
@@ -151,6 +150,14 @@ export type ActivityPoint = {
   deletes: number
 }
 
+export type SentinelApplication = {
+  id: string
+  name: string
+  description: string
+  client_id: string
+  icon_url: string
+}
+
 export type SentinelGroup = {
   id: string
   name: string
@@ -161,7 +168,6 @@ export type SentinelGroup = {
 export type BucketInput = {
   name: string
   description: string
-  access_group_names: string[]
   allow_public_files: boolean
 }
 
@@ -299,6 +305,11 @@ export async function getStats() {
 
 export async function getActivity(days = 30) {
   const response = await api.get<ActivityPoint[]>("/stats/activity", { params: { days } })
+  return response.data
+}
+
+export async function listSentinelApplications() {
+  const response = await api.get<SentinelApplication[]>("/applications")
   return response.data
 }
 

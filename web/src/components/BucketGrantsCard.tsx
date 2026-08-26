@@ -3,6 +3,7 @@ import { AppWindow, Pencil, Plus, Trash2 } from "lucide-react"
 import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
 
+import { ApplicationSelect } from "@/components/ApplicationPicker"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -16,7 +17,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useApplications } from "@/lib/applications"
 import {
   createBucketGrant,
   deleteBucketGrant,
@@ -40,26 +41,29 @@ import {
 function GrantFormDialog({
   trigger,
   grant,
+  takenClientIDs,
   isPending,
   onSubmit,
 }: {
   trigger: ReactNode
   grant?: BucketGrant
+  takenClientIDs: string[]
   isPending: boolean
   onSubmit: (input: BucketGrantInput) => Promise<void>
 }) {
   const [open, setOpen] = useState(false)
   const [clientID, setClientID] = useState("")
-  const [description, setDescription] = useState("")
   const [access, setAccess] = useState<BucketAccess>("READ")
   const isEdit = !!grant
+  const { data: applications } = useApplications()
+  const appName = applications?.find((app) => app.client_id === grant?.client_id)?.name
 
-  const valid = isEdit || clientID.trim() !== ""
+  const valid = isEdit || clientID !== ""
 
   async function submit() {
-    const input: BucketGrantInput = { description: description.trim(), access }
+    const input: BucketGrantInput = { description: "", access }
     if (!isEdit) {
-      input.client_id = clientID.trim()
+      input.client_id = clientID
     }
     await onSubmit(input)
     setOpen(false)
@@ -72,7 +76,6 @@ function GrantFormDialog({
         setOpen(next)
         if (next) {
           setClientID(grant?.client_id ?? "")
-          setDescription(grant?.description ?? "")
           setAccess(grant?.access ?? "READ")
         }
       }}
@@ -80,50 +83,43 @@ function GrantFormDialog({
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEdit ? `Edit access for ${grant.client_id}` : "Grant application access"}</DialogTitle>
+          <DialogTitle>
+            {isEdit ? `Edit access for ${appName ?? grant.client_id}` : "Grant application access"}
+          </DialogTitle>
           <DialogDescription>
             Applications authenticate with their own Sentinel client, so access is granted per
             client ID. Read allows downloads; write also allows uploads.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="grant-client-id">Client ID</Label>
-            <Input
-              id="grant-client-id"
-              value={clientID}
-              disabled={isEdit}
-              onChange={(event) => setClientID(event.target.value)}
-              placeholder="the application's Sentinel client_id"
-              autoComplete="off"
-            />
+        {isEdit ? (
+          <div className="space-y-3">
+            <div className="rounded-lg border border-border px-3 py-2">
+              <p className="text-sm font-medium">{appName ?? grant.client_id}</p>
+              <p className="font-mono text-xs text-muted-foreground">{grant.client_id}</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="grant-access">Access</Label>
+              <Select value={access} onValueChange={(value) => setAccess(value as BucketAccess)}>
+                <SelectTrigger id="grant-access" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="READ">Read — download files</SelectItem>
+                  <SelectItem value="WRITE">Write — upload and download files</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="grant-description">Label (optional)</Label>
-            <Input
-              id="grant-description"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              placeholder="Mapache telemetry exporter"
-              autoComplete="off"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="grant-access">Access</Label>
-            <Select value={access} onValueChange={(value) => setAccess(value as BucketAccess)}>
-              <SelectTrigger id="grant-access" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="READ">Read — download files</SelectItem>
-                <SelectItem value="WRITE">Write — upload and download files</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        ) : (
+          <ApplicationSelect
+            clientID={clientID}
+            access={access}
+            onSelect={setClientID}
+            onAccessChange={setAccess}
+            excludeClientIDs={takenClientIDs}
+          />
+        )}
 
         <DialogFooter>
           <Button type="button" variant="secondary" disabled={isPending} onClick={() => setOpen(false)}>
@@ -188,6 +184,9 @@ export function BucketGrantsCard({ bucketName }: { bucketName: string }) {
   })
 
   const grants = grantsQuery.data ?? []
+  const { data: applications } = useApplications()
+  const nameFor = (clientID: string) =>
+    applications?.find((app) => app.client_id === clientID)?.name
 
   return (
     <Card className="mb-6">
@@ -195,8 +194,8 @@ export function BucketGrantsCard({ bucketName }: { bucketName: string }) {
         <div className="space-y-1.5">
           <CardTitle>Application access</CardTitle>
           <CardDescription>
-            Which applications may read or write files in this bucket. Humans get access through the
-            bucket's groups instead.
+            Which applications may read or write files in this bucket. Depot admins always have
+            access; every other caller needs a grant.
           </CardDescription>
         </div>
         <GrantFormDialog
@@ -206,6 +205,7 @@ export function BucketGrantsCard({ bucketName }: { bucketName: string }) {
               Grant
             </Button>
           }
+          takenClientIDs={grants.map((grant) => grant.client_id)}
           isPending={createMutation.isPending}
           onSubmit={async (input) => {
             await createMutation.mutateAsync(input)
@@ -221,7 +221,7 @@ export function BucketGrantsCard({ bucketName }: { bucketName: string }) {
           </div>
         ) : grants.length === 0 ? (
           <p className="px-6 pb-6 text-sm text-muted-foreground">
-            No applications have access. Files in this bucket are reachable only through the web UI.
+            No applications have access. Files here are reachable only by Depot admins.
           </p>
         ) : (
           <ul className="divide-y divide-border border-t border-border">
@@ -232,16 +232,16 @@ export function BucketGrantsCard({ bucketName }: { bucketName: string }) {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate font-mono text-sm">{grant.client_id}</span>
+                    <span className="truncate text-sm font-medium">
+                      {nameFor(grant.client_id) ?? grant.client_id}
+                    </span>
                     <Badge variant={grant.access === "WRITE" ? "default" : "secondary"}>
                       {grant.access}
                     </Badge>
                   </div>
-                  {grant.description && (
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {grant.description}
-                    </p>
-                  )}
+                  <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
+                    {grant.client_id}
+                  </p>
                 </div>
                 <div className="flex shrink-0 gap-1.5">
                   <GrantFormDialog
@@ -252,6 +252,7 @@ export function BucketGrantsCard({ bucketName }: { bucketName: string }) {
                       </Button>
                     }
                     grant={grant}
+                    takenClientIDs={[]}
                     isPending={updateMutation.isPending}
                     onSubmit={async (input) => {
                       await updateMutation.mutateAsync({ clientID: grant.client_id, input })

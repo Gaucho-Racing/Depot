@@ -1,10 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Clock3, Package, Plus, Search } from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
+import { Clock3, Globe, Package, Plus, Search } from "lucide-react"
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-import { toast } from "sonner"
 
-import { BucketFormDialog } from "@/components/BucketFormDialog"
 import { PageContainer, PageHeader } from "@/components/PageContainer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -12,27 +10,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/lib/auth"
-import { createBucket, errorMessage, listBuckets, type BucketInput } from "@/lib/depot"
+import { listBuckets } from "@/lib/depot"
 
 export default function BucketsPage() {
   const [search, setSearch] = useState("")
-  const queryClient = useQueryClient()
   const { user } = useAuth()
   const isAdmin = user?.groups?.includes("Admins") ?? false
 
   const bucketsQuery = useQuery({ queryKey: ["buckets"], queryFn: listBuckets })
-
-  const createMutation = useMutation({
-    mutationFn: (input: BucketInput) => createBucket(input),
-    onSuccess: (bucket) => {
-      toast.success(`Bucket ${bucket.name} created`)
-      void queryClient.invalidateQueries({ queryKey: ["buckets"] })
-    },
-    onError: (error) => {
-      toast.error(errorMessage(error, "Failed to create bucket"))
-      throw error
-    },
-  })
 
   const buckets = useMemo(() => bucketsQuery.data ?? [], [bucketsQuery.data])
   const filteredBuckets = useMemo(
@@ -47,18 +32,12 @@ export default function BucketsPage() {
         description="Namespaces for application and team files."
         action={
           isAdmin ? (
-            <BucketFormDialog
-              trigger={
-                <Button>
-                  <Plus className="size-4" />
-                  Bucket
-                </Button>
-              }
-              isPending={createMutation.isPending}
-              onSubmit={async (input) => {
-                await createMutation.mutateAsync(input)
-              }}
-            />
+            <Button asChild>
+              <Link to="/buckets/new">
+                <Plus className="size-4" />
+                Bucket
+              </Link>
+            </Button>
           ) : undefined
         }
       />
@@ -117,14 +96,10 @@ export default function BucketsPage() {
                     {bucket.description || "No description"}
                   </p>
                   <div className="flex min-h-6 flex-wrap gap-1.5">
-                    {(bucket.access_group_names ?? []).length === 0 ? (
-                      <Badge variant="secondary">Scoped access</Badge>
-                    ) : (
-                      (bucket.access_group_names ?? []).map((group) => (
-                        <Badge key={group} variant="outline">
-                          {group}
-                        </Badge>
-                      ))
+                    {bucket.allow_public_files && (
+                      <Badge variant="outline" className="border-gr-purple text-gr-purple">
+                        <Globe className="size-3" /> Public files
+                      </Badge>
                     )}
                   </div>
                   <div className="flex items-center gap-1.5 border-t border-border/50 pt-3 text-xs text-muted-foreground">
