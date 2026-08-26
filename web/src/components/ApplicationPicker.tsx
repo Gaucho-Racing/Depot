@@ -88,8 +88,8 @@ function ResultsList({
   if (isError) {
     return (
       <p className="p-3 text-xs text-muted-foreground">
-        Could not load applications from Sentinel. Sign out and back in if you were signed in
-        before this feature shipped — the app list needs the applications:read scope.
+        Could not load applications from Sentinel. Check that SENTINEL_SA_TOKEN is set and still
+        valid — Depot uses its own service account to read the application list.
       </p>
     )
   }

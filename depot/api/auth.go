@@ -7,6 +7,7 @@ import (
 	"github.com/gaucho-racing/depot/depot/config"
 	"github.com/gaucho-racing/depot/depot/pkg/logger"
 	"github.com/gaucho-racing/depot/depot/pkg/sentinel"
+	"github.com/gaucho-racing/depot/depot/service"
 	"github.com/gin-gonic/gin"
 )
 
@@ -87,7 +88,7 @@ func ListSentinelGroups(c *gin.Context) {
 func ListSentinelApplications(c *gin.Context) {
 	Require(c, RequestTokenIsAdmin(c))
 
-	applications, err := sentinel.GetApplications(GetRequestToken(c))
+	applications, err := service.ListApplications()
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return

@@ -45,6 +45,9 @@ func Verify() {
 	if SentinelClientID == "" || SentinelClientSecret == "" {
 		logger.SugarLogger.Warnf("SENTINEL_CLIENT_ID / SENTINEL_CLIENT_SECRET are not set, web login will be unavailable and no token will resolve as first-party (admin access unreachable)")
 	}
+	if SentinelSAToken == "" {
+		logger.SugarLogger.Warnf("SENTINEL_SA_TOKEN is not set, the Sentinel application list will be unavailable")
+	}
 	if StorageBackend == "" {
 		StorageBackend = "s3"
 		logger.SugarLogger.Infof("STORAGE_BACKEND is not set, defaulting to %s", StorageBackend)

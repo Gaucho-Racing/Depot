@@ -203,14 +203,17 @@ func GetGroups(accessToken string) ([]Group, error) {
 	return groups, nil
 }
 
-// GetApplications lists every Sentinel application. Requires the caller's
-// token to carry applications:read, which Depot's web client requests at login.
-func GetApplications(accessToken string) ([]Application, error) {
+// GetApplications lists every Sentinel application using Depot's own service
+// account token rather than the caller's. Depot already decides who may see
+// the list (admins only), so forwarding a user token would just mean every
+// human session had to carry applications:read.
+func GetApplications() ([]Application, error) {
 	if strings.TrimSpace(config.SentinelURL) == "" {
 		return []Application{}, fmt.Errorf("SENTINEL_URL is not configured")
 	}
-	if strings.TrimSpace(accessToken) == "" {
-		return []Application{}, fmt.Errorf("access token is required")
+	accessToken := strings.TrimSpace(config.SentinelSAToken)
+	if accessToken == "" {
+		return []Application{}, fmt.Errorf("SENTINEL_SA_TOKEN is not configured")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, strings.TrimRight(config.SentinelURL, "/")+"/api/applications", nil)
