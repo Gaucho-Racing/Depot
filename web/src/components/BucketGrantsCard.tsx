@@ -7,7 +7,14 @@ import { ApplicationSelect } from "@/components/ApplicationPicker"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -81,7 +88,7 @@ function GrantFormDialog({
       }}
     >
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? `Edit access for ${appName ?? grant.client_id}` : "Grant application access"}
@@ -122,7 +129,12 @@ function GrantFormDialog({
         )}
 
         <DialogFooter>
-          <Button type="button" variant="secondary" disabled={isPending} onClick={() => setOpen(false)}>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={isPending}
+            onClick={() => setOpen(false)}
+          >
             Cancel
           </Button>
           <Button type="button" disabled={!valid || isPending} onClick={() => void submit()}>
@@ -189,28 +201,28 @@ export function BucketGrantsCard({ bucketName }: { bucketName: string }) {
     applications?.find((app) => app.client_id === clientID)?.name
 
   return (
-    <Card className="mb-6">
-      <CardHeader className="flex-row items-start justify-between gap-4">
-        <div className="space-y-1.5">
-          <CardTitle>Application access</CardTitle>
-          <CardDescription>
-            Which applications may read or write files in this bucket. Depot admins always have
-            access; every other caller needs a grant.
-          </CardDescription>
-        </div>
-        <GrantFormDialog
-          trigger={
-            <Button size="sm">
-              <Plus className="size-4" />
-              Grant
-            </Button>
-          }
-          takenClientIDs={grants.map((grant) => grant.client_id)}
-          isPending={createMutation.isPending}
-          onSubmit={async (input) => {
-            await createMutation.mutateAsync(input)
-          }}
-        />
+    <Card>
+      <CardHeader>
+        <CardTitle>Application access</CardTitle>
+        <CardDescription>
+          Which applications may read or write files in this bucket. Depot admins always have
+          access; every other caller needs a grant.
+        </CardDescription>
+        <CardAction>
+          <GrantFormDialog
+            trigger={
+              <Button size="sm">
+                <Plus className="size-4" />
+                Grant
+              </Button>
+            }
+            takenClientIDs={grants.map((grant) => grant.client_id)}
+            isPending={createMutation.isPending}
+            onSubmit={async (input) => {
+              await createMutation.mutateAsync(input)
+            }}
+          />
+        </CardAction>
       </CardHeader>
       <CardContent className="p-0">
         {grantsQuery.isLoading ? (
@@ -255,7 +267,10 @@ export function BucketGrantsCard({ bucketName }: { bucketName: string }) {
                     takenClientIDs={[]}
                     isPending={updateMutation.isPending}
                     onSubmit={async (input) => {
-                      await updateMutation.mutateAsync({ clientID: grant.client_id, input })
+                      await updateMutation.mutateAsync({
+                        clientID: grant.client_id,
+                        input,
+                      })
                     }}
                   />
                   <ConfirmDialog

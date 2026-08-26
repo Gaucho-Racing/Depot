@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell"
 import { RequireAuth } from "@/components/RequireAuth"
 import BucketDetailsPage from "@/pages/BucketDetailsPage"
 import BucketsPage from "@/pages/BucketsPage"
+import EditBucketPage from "@/pages/EditBucketPage"
 import DashboardPage from "@/pages/DashboardPage"
 import LoginPage from "@/pages/LoginPage"
 import NewBucketPage from "@/pages/NewBucketPage"
@@ -24,6 +25,7 @@ export const router = createBrowserRouter([
           { path: "/buckets", element: <BucketsPage /> },
           { path: "/buckets/new", element: <NewBucketPage /> },
           { path: "/buckets/:bucketName", element: <BucketDetailsPage /> },
+          { path: "/buckets/:bucketName/edit", element: <EditBucketPage /> },
           { path: "/search", element: <SearchPage /> },
           { path: "/storage-backends", element: <StorageBackendsPage /> },
           { path: "/settings", element: <SettingsPage /> },
