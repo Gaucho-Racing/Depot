@@ -33,6 +33,7 @@ export function BucketFormDialog({
   const [name, setName] = useState(bucket?.name ?? "")
   const [description, setDescription] = useState(bucket?.description ?? "")
   const [groups, setGroups] = useState<string[]>(bucket?.access_group_names ?? [])
+  const [allowPublicFiles, setAllowPublicFiles] = useState(bucket?.allow_public_files ?? false)
 
   const groupsQuery = useQuery({
     queryKey: ["sentinelGroups"],
@@ -51,12 +52,18 @@ export function BucketFormDialog({
 
   async function handleSubmit() {
     try {
-      await onSubmit({ name: name.trim(), description: description.trim(), access_group_names: groups })
+      await onSubmit({
+        name: name.trim(),
+        description: description.trim(),
+        access_group_names: groups,
+        allow_public_files: allowPublicFiles,
+      })
       setOpen(false)
       if (!bucket) {
         setName("")
         setDescription("")
         setGroups([])
+        setAllowPublicFiles(false)
       }
     } catch {
       return
@@ -129,6 +136,24 @@ export function BucketFormDialog({
                 })
               )}
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Public files</Label>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={allowPublicFiles}
+                onChange={(event) => setAllowPublicFiles(event.target.checked)}
+                className="mt-0.5 size-4 accent-(--color-gr-purple)"
+              />
+              <span>
+                Allow files here to be downloaded without a token
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Files are still private unless marked public at upload. Turning this off revokes
+                  anonymous access to every public file in the bucket.
+                </span>
+              </span>
+            </label>
           </div>
         </div>
 

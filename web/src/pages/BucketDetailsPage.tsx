@@ -51,8 +51,11 @@ export default function BucketDetailsPage() {
     (bucketQuery.data?.access_group_names ?? []).some((group) => user?.groups?.includes(group))
 
   const updateMutation = useMutation({
-    mutationFn: (input: { description: string; access_group_names: string[] }) =>
-      updateBucket(bucketName, input),
+    mutationFn: (input: {
+      description: string
+      access_group_names: string[]
+      allow_public_files: boolean
+    }) => updateBucket(bucketName, input),
     onSuccess: () => {
       toast.success("Bucket updated")
       void queryClient.invalidateQueries({ queryKey: ["bucket", bucketName] })
@@ -102,6 +105,7 @@ export default function BucketDetailsPage() {
                     await updateMutation.mutateAsync({
                       description: input.description,
                       access_group_names: input.access_group_names,
+                      allow_public_files: input.allow_public_files,
                     })
                   }}
                 />
@@ -131,6 +135,7 @@ export default function BucketDetailsPage() {
                   </Button>
                 }
                 bucket={bucketName}
+                allowPublicFiles={bucket?.allow_public_files ?? false}
               />
             )}
           </div>
@@ -147,6 +152,11 @@ export default function BucketDetailsPage() {
                 {group}
               </Badge>
             ))
+          )}
+          {bucket.allow_public_files && (
+            <Badge variant="outline" className="border-gr-purple text-gr-purple">
+              <Globe className="size-3" /> Public files allowed
+            </Badge>
           )}
         </div>
       )}

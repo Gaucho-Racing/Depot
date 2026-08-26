@@ -14,6 +14,7 @@ type bucketRequest struct {
 	Name             string   `json:"name"`
 	Description      string   `json:"description"`
 	AccessGroupNames []string `json:"access_group_names"`
+	AllowPublicFiles bool     `json:"allow_public_files"`
 }
 
 func ListBuckets(c *gin.Context) {
@@ -54,6 +55,7 @@ func CreateBucket(c *gin.Context) {
 		Name:              req.Name,
 		Description:       req.Description,
 		AccessGroupNames:  req.AccessGroupNames,
+		AllowPublicFiles:  req.AllowPublicFiles,
 		CreatedByEntityID: GetRequestTokenEntityID(c),
 		UpdatedByEntityID: GetRequestTokenEntityID(c),
 	}
@@ -103,6 +105,7 @@ func UpdateBucket(c *gin.Context) {
 	}
 	bucket.Description = req.Description
 	bucket.AccessGroupNames = req.AccessGroupNames
+	bucket.AllowPublicFiles = req.AllowPublicFiles
 	bucket.UpdatedByEntityID = GetRequestTokenEntityID(c)
 
 	updated, err := service.UpdateBucket(bucket)

@@ -41,6 +41,14 @@ func findFile(c *gin.Context, bucket model.Bucket) (model.File, bool) {
 	return file, true
 }
 
+// publiclyReadable reports whether a file may be served without a token. Both
+// the file's own flag and its bucket's must allow it, which makes
+// AllowPublicFiles a bucket-wide kill switch for anonymous access — the only
+// way to walk back an accidental public upload now that files are append-only.
+func publiclyReadable(bucket model.Bucket, file model.File) bool {
+	return file.Public && bucket.AllowPublicFiles
+}
+
 func splitBackendNames(value string) []string {
 	names := []string{}
 	for _, part := range strings.Split(value, ",") {
@@ -183,6 +191,10 @@ func UploadFile(c *gin.Context) {
 		}
 		file.Public = public
 	}
+	if file.Public && !bucket.AllowPublicFiles {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "this bucket does not allow public files"})
+		return
+	}
 	if tagsValue := c.PostForm("tags"); tagsValue != "" {
 		if err := json.Unmarshal([]byte(tagsValue), &file.Tags); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "tags must be a JSON object of string keys and string values"})
@@ -215,7 +227,7 @@ func GetFile(c *gin.Context) {
 	if !ok {
 		return
 	}
-	Require(c, file.Public || RequestTokenCanReadBucket(c, bucket))
+	Require(c, publiclyReadable(bucket, file) || RequestTokenCanReadBucket(c, bucket))
 
 	c.JSON(http.StatusOK, file)
 }
@@ -248,7 +260,7 @@ func GetFileContent(c *gin.Context) {
 	if !ok {
 		return
 	}
-	Require(c, file.Public || RequestTokenCanReadBucket(c, bucket))
+	Require(c, publiclyReadable(bucket, file) || RequestTokenCanReadBucket(c, bucket))
 
 	if file.Status != model.FileStatusActive {
 		c.JSON(http.StatusConflict, gin.H{"error": "file upload has not been completed"})
@@ -281,7 +293,7 @@ func CreateDownloadURL(c *gin.Context) {
 	if !ok {
 		return
 	}
-	Require(c, file.Public || RequestTokenCanReadBucket(c, bucket))
+	Require(c, publiclyReadable(bucket, file) || RequestTokenCanReadBucket(c, bucket))
 
 	if file.Status != model.FileStatusActive {
 		c.JSON(http.StatusConflict, gin.H{"error": "file upload has not been completed"})
@@ -323,6 +335,10 @@ func InitiateUpload(c *gin.Context) {
 	}
 	if req.Name == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
+		return
+	}
+	if req.Public && !bucket.AllowPublicFiles {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "this bucket does not allow public files"})
 		return
 	}
 
