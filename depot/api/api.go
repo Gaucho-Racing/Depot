@@ -86,15 +86,6 @@ func InitializeRoutes(router *gin.Engine) {
 	router.POST("/buckets/:bucketName/uploads", InitiateUpload)
 	router.POST("/buckets/:bucketName/uploads/:id/complete", CompleteUpload)
 
-	// The same file operations for Depot's own web app, gated on a token minted
-	// for Depot's OAuth client whose entity is in DepotAdmins rather than on a
-	// bucket grant. Privileged file operations the application API deliberately
-	// does not expose — updating or deleting a file — belong here.
-	internal := router.Group("/internal", RequireInternal())
-
-	internal.POST("/buckets/:bucketName/files", UploadFile)
-	internal.GET("/buckets/:bucketName/files/:id/content", GetFileContent)
-	internal.POST("/buckets/:bucketName/files/:id/download-url", CreateDownloadURL)
 }
 
 func AuthChecker() gin.HandlerFunc {
@@ -206,7 +197,8 @@ func RequestTokenIsFirstParty(c *gin.Context) bool {
 // AdminGroupName is the Sentinel group whose members administer Depot.
 const AdminGroupName = "DepotAdmins"
 
-// RequestTokenIsAdmin authorizes Depot's internal surface. Both halves matter:
+// RequestTokenIsAdmin authorizes Depot's administrative surface. Both halves
+// matter:
 // the token must have been minted for Depot's own OAuth client, and its entity
 // must belong to the DepotAdmins group. An application token can never
 // reshape Depot regardless of what its entity's group memberships say.
@@ -219,39 +211,6 @@ func RequestTokenIsAdmin(c *gin.Context) bool {
 		return true
 	}
 	return RequestTokenIsFirstParty(c) && RequestTokenHasGroupName(c, AdminGroupName)
-}
-
-// RequireInternal gates the /internal surface: the file operations Depot's own
-// web app performs, authorized by administrator identity rather than by a
-// bucket grant. Handlers under it can treat the request as authorized.
-func RequireInternal() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if !RequestTokenExists(c) {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "authentication is required",
-			})
-			return
-		}
-		if !RequestTokenIsAdmin(c) {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
-				"error": "this endpoint is restricted to Depot administrators",
-			})
-			return
-		}
-		c.Set("Depot-Internal", true)
-		c.Next()
-	}
-}
-
-// RequestIsInternal reports whether the request arrived through the /internal
-// surface, meaning RequireInternal already authorized it.
-func RequestIsInternal(c *gin.Context) bool {
-	value, exists := c.Get("Depot-Internal")
-	if !exists {
-		return false
-	}
-	internal, _ := value.(bool)
-	return internal
 }
 
 // RequestTokenCanReadBucket and RequestTokenCanUploadToBucket are the data
@@ -274,14 +233,11 @@ func RequestTokenCanReadBucket(c *gin.Context, bucket model.Bucket) bool {
 	return service.ClientCanReadBucket(bucket.ID, GetRequestTokenClientID(c))
 }
 
-// RequestTokenCanUploadToBucket is the public write path, reserved for
-// applications holding a WRITE grant. Depot's own admins upload through
-// /internal instead, so there is deliberately no admin bypass here.
 func RequestTokenCanUploadToBucket(c *gin.Context, bucket model.Bucket) bool {
 	if !RequestTokenExists(c) {
 		return false
 	}
-	if RequestIsInternal(c) {
+	if RequestTokenIsAdmin(c) {
 		return true
 	}
 	if RequestTokenIsFirstParty(c) {

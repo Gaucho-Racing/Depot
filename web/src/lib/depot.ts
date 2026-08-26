@@ -276,7 +276,7 @@ export async function uploadFile(
   if (input.path) form.append("path", input.path)
   if (input.public !== undefined) form.append("public", String(input.public))
   if (input.tags && Object.keys(input.tags).length > 0) form.append("tags", JSON.stringify(input.tags))
-  const response = await api.post<DepotFile>(`/internal/buckets/${encodeURIComponent(bucket)}/files`, form, {
+  const response = await api.post<DepotFile>(`/buckets/${encodeURIComponent(bucket)}/files`, form, {
     onUploadProgress: (event) => {
       if (onProgress && event.total) {
         onProgress(Math.round((event.loaded / event.total) * 100))
@@ -288,7 +288,7 @@ export async function uploadFile(
 
 export async function createDownloadURL(bucket: string, id: string) {
   const response = await api.post<{ url: string; method: string; expires_at: string }>(
-    `/internal/buckets/${encodeURIComponent(bucket)}/files/${encodeURIComponent(id)}/download-url`,
+    `/buckets/${encodeURIComponent(bucket)}/files/${encodeURIComponent(id)}/download-url`,
   )
   return response.data
 }
