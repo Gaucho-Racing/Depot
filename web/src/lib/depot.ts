@@ -4,11 +4,33 @@ export type Bucket = {
   id: string
   name: string
   description: string
-  access_group_names: string[] | null
+  allow_public_files: boolean
+  allow_authenticated_read: boolean
   created_by_entity_id: string
   updated_by_entity_id: string
   created_at: string
   updated_at: string
+}
+
+export type BucketAccess = "READ" | "WRITE"
+
+export type BucketGrant = {
+  id: string
+  bucket_id: string
+  bucket_name: string
+  client_id: string
+  description: string
+  access: BucketAccess
+  created_by_entity_id: string
+  updated_by_entity_id: string
+  created_at: string
+  updated_at: string
+}
+
+export type BucketGrantInput = {
+  client_id?: string
+  description: string
+  access: BucketAccess
 }
 
 export type FileReplica = {
@@ -29,14 +51,15 @@ export type DepotFile = {
   path: string
   content_type: string
   size_bytes: number
-  checksum: string
   status: "PENDING" | "ACTIVE"
   public: boolean
   tags: Record<string, string> | null
   storage_backend: string
   replicas: FileReplica[]
   created_by_entity_id: string
+  created_by_client_id: string
   updated_by_entity_id: string
+  updated_by_client_id: string
   created_at: string
   updated_at: string
 }
@@ -87,6 +110,8 @@ export type AccessLog = {
   bucket_name: string
   action: "UPLOAD" | "PRESIGN_UPLOAD" | "DOWNLOAD" | "PRESIGN_DOWNLOAD" | "DELETE"
   entity_id: string
+  client_id: string
+  actor_type: "USER" | "SERVICE_ACCOUNT" | "ANONYMOUS"
   public: boolean
   created_at: string
 }
@@ -104,12 +129,19 @@ export type EntityStats = {
   total_bytes: number
 }
 
+export type ApplicationStats = {
+  client_id: string
+  file_count: number
+  total_bytes: number
+}
+
 export type Stats = {
   total_files: number
   total_bytes: number
   total_buckets: number
   buckets: BucketStats[]
   top_uploaders: EntityStats[]
+  top_applications: ApplicationStats[]
 }
 
 export type ActivityPoint = {
@@ -117,6 +149,14 @@ export type ActivityPoint = {
   uploads: number
   downloads: number
   deletes: number
+}
+
+export type SentinelApplication = {
+  id: string
+  name: string
+  description: string
+  client_id: string
+  icon_url: string
 }
 
 export type SentinelGroup = {
@@ -129,7 +169,8 @@ export type SentinelGroup = {
 export type BucketInput = {
   name: string
   description: string
-  access_group_names: string[]
+  allow_public_files: boolean
+  allow_authenticated_read: boolean
 }
 
 export async function listStorageBackends() {
@@ -180,6 +221,35 @@ export async function deleteBucket(name: string) {
   await api.delete(`/buckets/${encodeURIComponent(name)}`)
 }
 
+export async function listBucketGrants(bucket: string) {
+  const response = await api.get<BucketGrant[]>(`/buckets/${encodeURIComponent(bucket)}/grants`)
+  return response.data
+}
+
+export async function createBucketGrant(bucket: string, input: BucketGrantInput) {
+  const response = await api.post<BucketGrant>(
+    `/buckets/${encodeURIComponent(bucket)}/grants`,
+    input,
+  )
+  return response.data
+}
+
+export async function updateBucketGrant(
+  bucket: string,
+  clientID: string,
+  input: Omit<BucketGrantInput, "client_id">,
+) {
+  const response = await api.patch<BucketGrant>(
+    `/buckets/${encodeURIComponent(bucket)}/grants/${encodeURIComponent(clientID)}`,
+    input,
+  )
+  return response.data
+}
+
+export async function deleteBucketGrant(bucket: string, clientID: string) {
+  await api.delete(`/buckets/${encodeURIComponent(bucket)}/grants/${encodeURIComponent(clientID)}`)
+}
+
 export async function listFiles(
   bucket: string,
   params: { q?: string; path_prefix?: string; limit?: number; offset?: number } = {},
@@ -216,22 +286,6 @@ export async function uploadFile(
   return response.data
 }
 
-export async function updateFile(
-  bucket: string,
-  id: string,
-  input: Partial<{ name: string; path: string; public: boolean; tags: Record<string, string> }>,
-) {
-  const response = await api.put<DepotFile>(
-    `/buckets/${encodeURIComponent(bucket)}/files/${encodeURIComponent(id)}`,
-    input,
-  )
-  return response.data
-}
-
-export async function deleteFile(bucket: string, id: string) {
-  await api.delete(`/buckets/${encodeURIComponent(bucket)}/files/${encodeURIComponent(id)}`)
-}
-
 export async function createDownloadURL(bucket: string, id: string) {
   const response = await api.post<{ url: string; method: string; expires_at: string }>(
     `/buckets/${encodeURIComponent(bucket)}/files/${encodeURIComponent(id)}/download-url`,
@@ -253,6 +307,11 @@ export async function getStats() {
 
 export async function getActivity(days = 30) {
   const response = await api.get<ActivityPoint[]>("/stats/activity", { params: { days } })
+  return response.data
+}
+
+export async function listSentinelApplications() {
+  const response = await api.get<SentinelApplication[]>("/applications")
   return response.data
 }
 

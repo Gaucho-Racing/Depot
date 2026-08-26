@@ -68,5 +68,8 @@ func DeleteBucket(bucket model.Bucket) error {
 	if count > 0 {
 		return fmt.Errorf("bucket contains %d files and cannot be deleted", count)
 	}
+	if err := DeleteGrantsForBucket(bucket.ID); err != nil {
+		return err
+	}
 	return database.DB.Delete(&bucket).Error
 }

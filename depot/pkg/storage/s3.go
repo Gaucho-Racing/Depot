@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -113,7 +112,6 @@ func (b *S3Backend) Stat(ctx context.Context, key string) (ObjectInfo, error) {
 	}
 	info := ObjectInfo{
 		SizeBytes:   aws.ToInt64(output.ContentLength),
-		Checksum:    strings.Trim(aws.ToString(output.ETag), `"`),
 		ContentType: aws.ToString(output.ContentType),
 	}
 	return info, nil

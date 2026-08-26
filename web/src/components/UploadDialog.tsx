@@ -18,7 +18,15 @@ import { Label } from "@/components/ui/label"
 import { errorMessage, formatBytes, uploadFile } from "@/lib/depot"
 import { cn } from "@/lib/utils"
 
-export function UploadDialog({ trigger, bucket }: { trigger: ReactNode; bucket: string }) {
+export function UploadDialog({
+  trigger,
+  bucket,
+  allowPublicFiles,
+}: {
+  trigger: ReactNode
+  bucket: string
+  allowPublicFiles: boolean
+}) {
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [path, setPath] = useState("")
@@ -121,15 +129,21 @@ export function UploadDialog({ trigger, bucket }: { trigger: ReactNode; bucket: 
             />
           </div>
 
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={isPublic}
-              onChange={(event) => setIsPublic(event.target.checked)}
-              className="size-4 accent-(--color-gr-purple)"
-            />
-            Publicly accessible (no auth required to download)
-          </label>
+          {allowPublicFiles ? (
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={isPublic}
+                onChange={(event) => setIsPublic(event.target.checked)}
+                className="size-4 accent-(--color-gr-purple)"
+              />
+              Publicly accessible (no auth required to download)
+            </label>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              This bucket does not allow public files. Downloads always require a token.
+            </p>
+          )}
 
           {uploadMutation.isPending && (
             <div className="h-2 w-full overflow-hidden rounded-full bg-muted">

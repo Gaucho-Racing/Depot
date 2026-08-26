@@ -1,8 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Download, Globe, Lock, Trash2 } from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
+import { Download, Globe, Lock } from "lucide-react"
 import { toast } from "sonner"
 
-import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -15,11 +14,9 @@ import {
 } from "@/components/ui/sheet"
 import {
   createDownloadURL,
-  deleteFile,
   errorMessage,
   formatBytes,
   listFileAccessLogs,
-  updateFile,
   type DepotFile,
 } from "@/lib/depot"
 
@@ -44,43 +41,15 @@ const actionLabels: Record<string, string> = {
 
 export function FileSheet({
   file,
-  canWrite,
   onClose,
 }: {
   file: DepotFile | null
-  canWrite: boolean
   onClose: () => void
 }) {
-  const queryClient = useQueryClient()
-
   const logsQuery = useQuery({
     queryKey: ["accessLogs", file?.id],
     queryFn: () => listFileAccessLogs(file!.bucket_name, file!.id),
     enabled: !!file,
-  })
-
-  const publicMutation = useMutation({
-    mutationFn: (next: boolean) => updateFile(file!.bucket_name, file!.id, { public: next }),
-    onSuccess: (updated) => {
-      toast.success(updated.public ? "File is now public" : "File is now private")
-      void queryClient.invalidateQueries({ queryKey: ["files", file?.bucket_name] })
-      onClose()
-    },
-    onError: (error) => toast.error(errorMessage(error, "Failed to update file")),
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteFile(file!.bucket_name, file!.id),
-    onSuccess: () => {
-      toast.success("File deleted")
-      void queryClient.invalidateQueries({ queryKey: ["files", file?.bucket_name] })
-      void queryClient.invalidateQueries({ queryKey: ["stats"] })
-      onClose()
-    },
-    onError: (error) => {
-      toast.error(errorMessage(error, "Failed to delete file"))
-      throw error
-    },
   })
 
   async function handleDownload() {
@@ -119,33 +88,6 @@ export function FileSheet({
                   <Download className="size-4" />
                   Download
                 </Button>
-                {canWrite && (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={publicMutation.isPending}
-                      onClick={() => publicMutation.mutate(!file.public)}
-                    >
-                      {file.public ? <Lock className="size-4" /> : <Globe className="size-4" />}
-                      Make {file.public ? "private" : "public"}
-                    </Button>
-                    <ConfirmDialog
-                      trigger={
-                        <Button size="sm" variant="outline" className="text-destructive">
-                          <Trash2 className="size-4" />
-                        </Button>
-                      }
-                      title={`Delete ${file.name}?`}
-                      description="The file is removed from storage permanently. This cannot be undone."
-                      confirmLabel="Delete file"
-                      isPending={deleteMutation.isPending}
-                      onConfirm={async () => {
-                        await deleteMutation.mutateAsync()
-                      }}
-                    />
-                  </>
-                )}
               </div>
 
               <Separator />
@@ -154,9 +96,9 @@ export function FileSheet({
                 <Row label="Path" value={file.path} mono />
                 <Row label="Content type" value={file.content_type} />
                 <Row label="Size" value={formatBytes(file.size_bytes)} />
-                <Row label="Checksum" value={file.checksum} mono />
                 <Row label="Storage backend" value={file.storage_backend} mono />
                 <Row label="Uploaded by" value={file.created_by_entity_id} mono />
+                <Row label="Uploaded via" value={file.created_by_client_id} mono />
                 <Row label="Created" value={new Date(file.created_at).toLocaleString()} />
                 <Row label="Updated" value={new Date(file.updated_at).toLocaleString()} />
               </div>
@@ -230,6 +172,11 @@ export function FileSheet({
                           <span className="ml-1.5 font-mono text-muted-foreground">
                             {log.entity_id || "anonymous"}
                           </span>
+                          {log.client_id && (
+                            <span className="ml-1.5 font-mono text-muted-foreground">
+                              via {log.client_id}
+                            </span>
+                          )}
                         </span>
                         <span className="shrink-0 tabular-nums text-muted-foreground">
                           {new Date(log.created_at).toLocaleString(undefined, {

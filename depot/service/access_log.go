@@ -7,7 +7,15 @@ import (
 	ulid "github.com/gaucho-racing/ulid-go"
 )
 
-func RecordAccess(file model.File, action model.AccessAction, entityID string, public bool) {
+// Actor is the resolved principal behind a request: which entity acted, which
+// application's token they presented, and what kind of credential it was.
+type Actor struct {
+	EntityID string
+	ClientID string
+	Type     model.ActorType
+}
+
+func RecordAccess(file model.File, action model.AccessAction, actor Actor) {
 	log := model.AccessLog{
 		ID:         ulid.Make().Prefixed("acc"),
 		FileID:     file.ID,
@@ -15,8 +23,10 @@ func RecordAccess(file model.File, action model.AccessAction, entityID string, p
 		BucketID:   file.BucketID,
 		BucketName: file.BucketName,
 		Action:     action,
-		EntityID:   entityID,
-		Public:     public,
+		EntityID:   actor.EntityID,
+		ClientID:   actor.ClientID,
+		ActorType:  actor.Type,
+		Public:     actor.Type == model.ActorTypeAnonymous,
 	}
 	go func() {
 		if err := database.DB.Create(&log).Error; err != nil {

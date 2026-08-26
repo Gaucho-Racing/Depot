@@ -21,12 +21,19 @@ type EntityStats struct {
 	TotalBytes int64  `json:"total_bytes"`
 }
 
+type ApplicationStats struct {
+	ClientID   string `json:"client_id"`
+	FileCount  int64  `json:"file_count"`
+	TotalBytes int64  `json:"total_bytes"`
+}
+
 type Stats struct {
-	TotalFiles   int64         `json:"total_files"`
-	TotalBytes   int64         `json:"total_bytes"`
-	TotalBuckets int64         `json:"total_buckets"`
-	Buckets      []BucketStats `json:"buckets"`
-	TopUploaders []EntityStats `json:"top_uploaders"`
+	TotalFiles      int64              `json:"total_files"`
+	TotalBytes      int64              `json:"total_bytes"`
+	TotalBuckets    int64              `json:"total_buckets"`
+	Buckets         []BucketStats      `json:"buckets"`
+	TopUploaders    []EntityStats      `json:"top_uploaders"`
+	TopApplications []ApplicationStats `json:"top_applications"`
 }
 
 type ActivityPoint struct {
@@ -38,8 +45,9 @@ type ActivityPoint struct {
 
 func GetStats(bucketIDs []string) (Stats, error) {
 	stats := Stats{
-		Buckets:      []BucketStats{},
-		TopUploaders: []EntityStats{},
+		Buckets:         []BucketStats{},
+		TopUploaders:    []EntityStats{},
+		TopApplications: []ApplicationStats{},
 	}
 	if len(bucketIDs) == 0 {
 		return stats, nil
@@ -71,6 +79,16 @@ func GetStats(bucketIDs []string) (Stats, error) {
 		Limit(10).
 		Scan(&stats.TopUploaders).Error; err != nil {
 		return Stats{}, fmt.Errorf("failed to compute top uploaders: %w", err)
+	}
+
+	if err := database.DB.Model(&model.File{}).
+		Where("status = ? AND bucket_id IN ? AND created_by_client_id != ''", model.FileStatusActive, bucketIDs).
+		Select("created_by_client_id as client_id, count(*) as file_count, coalesce(sum(size_bytes), 0) as total_bytes").
+		Group("created_by_client_id").
+		Order("file_count desc").
+		Limit(10).
+		Scan(&stats.TopApplications).Error; err != nil {
+		return Stats{}, fmt.Errorf("failed to compute top applications: %w", err)
 	}
 
 	return stats, nil

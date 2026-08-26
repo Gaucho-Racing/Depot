@@ -63,9 +63,31 @@ export function clearSession() {
   localStorage.removeItem(SESSION_KEY)
 }
 
+export type SessionInfo = {
+  entity_id: string
+  user_id: string
+  client_id: string
+  scope: string
+  groups: string[]
+  first_party: boolean
+  is_admin: boolean
+}
+
 export function useAuth() {
   const queryClient = useQueryClient()
   const tokenSession = loadSession()
+  // Depot resolves is_admin itself, so the web app never has to know which
+  // Sentinel group the server is configured to trust.
+  const sessionQuery = useQuery({
+    queryKey: ["session", tokenSession?.accessToken],
+    queryFn: async () => {
+      const response = await api.get<SessionInfo>("/auth/session")
+      return response.data
+    },
+    enabled: !!tokenSession?.accessToken,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  })
   const userQuery = useQuery({
     queryKey: ["currentUser", tokenSession?.accessToken],
     queryFn: async () => {
@@ -85,8 +107,10 @@ export function useAuth() {
 
   return {
     user: userQuery.data,
+    session: sessionQuery.data,
+    isAdmin: sessionQuery.data?.is_admin ?? false,
     tokenSession,
-    isLoading: userQuery.isLoading,
+    isLoading: userQuery.isLoading || sessionQuery.isLoading,
     isAuthenticated: !!tokenSession,
     refresh: () => queryClient.invalidateQueries({ queryKey: ["currentUser"] }),
     logout,

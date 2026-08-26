@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"time"
@@ -156,13 +154,11 @@ func UploadFile(ctx context.Context, bucket model.Bucket, file model.File, body 
 	file.StorageKey = bucket.Name + "/" + file.ID
 	file.Status = model.FileStatusActive
 
-	hasher := sha256.New()
-	counter := &countingReader{reader: io.TeeReader(body, hasher)}
+	counter := &countingReader{reader: body}
 	if err := backend.Put(ctx, file.StorageKey, counter, file.ContentType); err != nil {
 		return model.File{}, fmt.Errorf("failed to write file to storage: %w", err)
 	}
 	file.SizeBytes = counter.count
-	file.Checksum = "sha256:" + hex.EncodeToString(hasher.Sum(nil))
 
 	if err := database.DB.Create(&file).Error; err != nil {
 		if deleteErr := backend.Delete(ctx, file.StorageKey); deleteErr != nil {
@@ -219,7 +215,6 @@ func CompleteUpload(ctx context.Context, file model.File) (model.File, error) {
 	}
 
 	file.SizeBytes = info.SizeBytes
-	file.Checksum = "etag:" + info.Checksum
 	if file.ContentType == "" {
 		file.ContentType = info.ContentType
 	}
@@ -339,41 +334,6 @@ func RetryStalledReplicas() {
 	for range ticker.C {
 		sweep()
 	}
-}
-
-func UpdateFile(file model.File) (model.File, error) {
-	if err := database.DB.Save(&file).Error; err != nil {
-		return model.File{}, err
-	}
-	return AttachReplicas(file), nil
-}
-
-func DeleteFile(ctx context.Context, file model.File) error {
-	backend, err := storage.GetBackend(file.StorageBackend)
-	if err == nil {
-		if err := backend.Delete(ctx, file.StorageKey); err != nil && err != storage.ErrObjectNotFound {
-			return fmt.Errorf("failed to delete file from storage: %w", err)
-		}
-	} else {
-		logger.SugarLogger.Errorf("primary storage backend unavailable while deleting file %s: %v", file.ID, err)
-	}
-
-	replicas := []model.FileReplica{}
-	database.DB.Where("file_id = ?", file.ID).Find(&replicas)
-	for _, replica := range replicas {
-		target, err := storage.GetBackend(replica.StorageBackend)
-		if err != nil {
-			logger.SugarLogger.Errorf("replica storage backend %s unavailable while deleting file %s", replica.StorageBackend, file.ID)
-			continue
-		}
-		if err := target.Delete(ctx, replica.StorageKey); err != nil && err != storage.ErrObjectNotFound {
-			logger.SugarLogger.Errorf("failed to delete replica of file %s from %s: %v", file.ID, replica.StorageBackend, err)
-		}
-	}
-	if err := database.DB.Where("file_id = ?", file.ID).Delete(&model.FileReplica{}).Error; err != nil {
-		return err
-	}
-	return database.DB.Delete(&file).Error
 }
 
 func activeReplicas(file model.File) []model.FileReplica {

@@ -332,8 +332,7 @@ function BackendFormDialog({
 
 export default function StorageBackendsPage() {
   const queryClient = useQueryClient()
-  const { user } = useAuth()
-  const isAdmin = user?.groups?.includes("Admins") ?? false
+  const { isAdmin } = useAuth()
 
   const backendsQuery = useQuery({ queryKey: ["storage-backends"], queryFn: listStorageBackends })
   const providersQuery = useQuery({ queryKey: ["storage-providers"], queryFn: listStorageProviders })

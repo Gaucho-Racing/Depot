@@ -18,6 +18,7 @@ var SentinelURL = os.Getenv("SENTINEL_URL")
 var SentinelClientID = os.Getenv("SENTINEL_CLIENT_ID")
 var SentinelClientSecret = os.Getenv("SENTINEL_CLIENT_SECRET")
 var SentinelRedirectURI = os.Getenv("SENTINEL_REDIRECT_URI")
+var SentinelSAToken = os.Getenv("SENTINEL_SA_TOKEN")
 
 var StorageBackend = os.Getenv("STORAGE_BACKEND")
 

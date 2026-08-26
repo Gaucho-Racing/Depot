@@ -11,9 +11,10 @@ import (
 )
 
 type bucketRequest struct {
-	Name             string   `json:"name"`
-	Description      string   `json:"description"`
-	AccessGroupNames []string `json:"access_group_names"`
+	Name                   string `json:"name"`
+	Description            string `json:"description"`
+	AllowPublicFiles       bool   `json:"allow_public_files"`
+	AllowAuthenticatedRead bool   `json:"allow_authenticated_read"`
 }
 
 func ListBuckets(c *gin.Context) {
@@ -51,11 +52,12 @@ func CreateBucket(c *gin.Context) {
 	}
 
 	bucket := model.Bucket{
-		Name:              req.Name,
-		Description:       req.Description,
-		AccessGroupNames:  req.AccessGroupNames,
-		CreatedByEntityID: GetRequestTokenEntityID(c),
-		UpdatedByEntityID: GetRequestTokenEntityID(c),
+		Name:                   req.Name,
+		Description:            req.Description,
+		AllowPublicFiles:       req.AllowPublicFiles,
+		AllowAuthenticatedRead: req.AllowAuthenticatedRead,
+		CreatedByEntityID:      GetRequestTokenEntityID(c),
+		UpdatedByEntityID:      GetRequestTokenEntityID(c),
 	}
 	created, err := service.CreateBucket(bucket)
 	if err != nil {
@@ -102,7 +104,8 @@ func UpdateBucket(c *gin.Context) {
 		return
 	}
 	bucket.Description = req.Description
-	bucket.AccessGroupNames = req.AccessGroupNames
+	bucket.AllowPublicFiles = req.AllowPublicFiles
+	bucket.AllowAuthenticatedRead = req.AllowAuthenticatedRead
 	bucket.UpdatedByEntityID = GetRequestTokenEntityID(c)
 
 	updated, err := service.UpdateBucket(bucket)

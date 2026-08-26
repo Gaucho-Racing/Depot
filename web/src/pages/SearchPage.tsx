@@ -9,15 +9,12 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useAuth } from "@/lib/auth"
 import { formatBytes, searchFiles, type DepotFile } from "@/lib/depot"
 
 export default function SearchPage() {
   const [query, setQuery] = useState("")
   const [submitted, setSubmitted] = useState("")
   const [selectedFile, setSelectedFile] = useState<DepotFile | null>(null)
-  const { user } = useAuth()
-  const isAdmin = user?.groups?.includes("Admins") ?? false
 
   const resultsQuery = useQuery({
     queryKey: ["search", submitted],
@@ -106,7 +103,7 @@ export default function SearchPage() {
         </Card>
       )}
 
-      <FileSheet file={selectedFile} canWrite={isAdmin} onClose={() => setSelectedFile(null)} />
+      <FileSheet file={selectedFile} onClose={() => setSelectedFile(null)} />
     </PageContainer>
   )
 }
