@@ -215,6 +215,9 @@ func RequestTokenCanReadBucket(c *gin.Context, bucket model.Bucket) bool {
 	if RequestTokenIsAdmin(c) {
 		return true
 	}
+	if bucket.AllowAuthenticatedRead {
+		return true
+	}
 	if RequestTokenIsFirstParty(c) {
 		return false
 	}

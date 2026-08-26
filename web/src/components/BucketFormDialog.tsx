@@ -30,6 +30,9 @@ export function BucketFormDialog({
   const [name, setName] = useState(bucket?.name ?? "")
   const [description, setDescription] = useState(bucket?.description ?? "")
   const [allowPublicFiles, setAllowPublicFiles] = useState(bucket?.allow_public_files ?? false)
+  const [allowAuthenticatedRead, setAllowAuthenticatedRead] = useState(
+    bucket?.allow_authenticated_read ?? false,
+  )
 
   async function handleSubmit() {
     try {
@@ -37,12 +40,14 @@ export function BucketFormDialog({
         name: name.trim(),
         description: description.trim(),
         allow_public_files: allowPublicFiles,
+        allow_authenticated_read: allowAuthenticatedRead,
       })
       setOpen(false)
       if (!bucket) {
         setName("")
         setDescription("")
         setAllowPublicFiles(false)
+        setAllowAuthenticatedRead(false)
       }
     } catch {
       return
@@ -88,6 +93,25 @@ export function BucketFormDialog({
               placeholder="What lives in this bucket?"
               rows={2}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Application access</Label>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={allowAuthenticatedRead}
+                onChange={(event) => setAllowAuthenticatedRead(event.target.checked)}
+                className="mt-0.5 size-4 accent-(--color-gr-purple)"
+              />
+              <span>
+                Readable by any authenticated application
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Any caller with a valid Sentinel token can download from this bucket. Uploads
+                  still need a write grant.
+                </span>
+              </span>
+            </label>
           </div>
 
           <div className="space-y-2">

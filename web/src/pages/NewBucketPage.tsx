@@ -22,6 +22,7 @@ export default function NewBucketPage() {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [allowPublicFiles, setAllowPublicFiles] = useState(false)
+  const [allowAuthenticatedRead, setAllowAuthenticatedRead] = useState(false)
   const [grants, setGrants] = useState<ApplicationAccess[]>([])
 
   const trimmedName = name.trim()
@@ -36,6 +37,7 @@ export default function NewBucketPage() {
         name: trimmedName,
         description: description.trim(),
         allow_public_files: allowPublicFiles,
+        allow_authenticated_read: allowAuthenticatedRead,
       })
 
       // The bucket has to exist before its grants can reference it, so a grant
@@ -136,8 +138,27 @@ export default function NewBucketPage() {
               everything else needs a grant. You can change this any time.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <ApplicationAccessPicker value={grants} onChange={setGrants} />
+          <CardContent className="space-y-4">
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={allowAuthenticatedRead}
+                onChange={(event) => setAllowAuthenticatedRead(event.target.checked)}
+                className="mt-0.5 size-4 accent-(--color-gr-purple)"
+              />
+              <span>
+                Readable by any authenticated application
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Any caller with a valid Sentinel token can download from this bucket. Uploads
+                  still need a write grant below.
+                </span>
+              </span>
+            </label>
+            <ApplicationAccessPicker
+              value={grants}
+              onChange={setGrants}
+              readIsRedundant={allowAuthenticatedRead}
+            />
           </CardContent>
         </Card>
 

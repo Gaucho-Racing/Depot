@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { Clock3, Globe, Package, Plus, Search } from "lucide-react"
+import { Clock3, Globe, Package, Plus, Search, Users } from "lucide-react"
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 
@@ -96,6 +96,11 @@ export default function BucketsPage() {
                     {bucket.description || "No description"}
                   </p>
                   <div className="flex min-h-6 flex-wrap gap-1.5">
+                    {bucket.allow_authenticated_read && (
+                      <Badge variant="secondary">
+                        <Users className="size-3" /> Any application
+                      </Badge>
+                    )}
                     {bucket.allow_public_files && (
                       <Badge variant="outline" className="border-gr-purple text-gr-purple">
                         <Globe className="size-3" /> Public files

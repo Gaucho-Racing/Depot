@@ -5,6 +5,7 @@ export type Bucket = {
   name: string
   description: string
   allow_public_files: boolean
+  allow_authenticated_read: boolean
   created_by_entity_id: string
   updated_by_entity_id: string
   created_at: string
@@ -169,6 +170,7 @@ export type BucketInput = {
   name: string
   description: string
   allow_public_files: boolean
+  allow_authenticated_read: boolean
 }
 
 export async function listStorageBackends() {

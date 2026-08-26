@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { FileIcon, Globe, Pencil, Search, Trash2, Upload } from "lucide-react"
+import { FileIcon, Globe, Pencil, Search, Trash2, Upload, Users } from "lucide-react"
 import { useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { toast } from "sonner"
@@ -49,8 +49,11 @@ export default function BucketDetailsPage() {
   const canWrite = isAdmin
 
   const updateMutation = useMutation({
-    mutationFn: (input: { description: string; allow_public_files: boolean }) =>
-      updateBucket(bucketName, input),
+    mutationFn: (input: {
+      description: string
+      allow_public_files: boolean
+      allow_authenticated_read: boolean
+    }) => updateBucket(bucketName, input),
     onSuccess: () => {
       toast.success("Bucket updated")
       void queryClient.invalidateQueries({ queryKey: ["bucket", bucketName] })
@@ -100,6 +103,7 @@ export default function BucketDetailsPage() {
                     await updateMutation.mutateAsync({
                       description: input.description,
                       allow_public_files: input.allow_public_files,
+                      allow_authenticated_read: input.allow_authenticated_read,
                     })
                   }}
                 />
@@ -136,11 +140,18 @@ export default function BucketDetailsPage() {
         }
       />
 
-      {bucket?.allow_public_files && (
+      {(bucket?.allow_authenticated_read || bucket?.allow_public_files) && (
         <div className="mb-6 flex flex-wrap gap-1.5">
-          <Badge variant="outline" className="border-gr-purple text-gr-purple">
-            <Globe className="size-3" /> Public files allowed
-          </Badge>
+          {bucket?.allow_authenticated_read && (
+            <Badge variant="secondary">
+              <Users className="size-3" /> Any application can read
+            </Badge>
+          )}
+          {bucket?.allow_public_files && (
+            <Badge variant="outline" className="border-gr-purple text-gr-purple">
+              <Globe className="size-3" /> Public files allowed
+            </Badge>
+          )}
         </div>
       )}
 

@@ -241,7 +241,7 @@ func GetFileAccessLogs(c *gin.Context) {
 	if !ok {
 		return
 	}
-	Require(c, RequestTokenCanReadBucket(c, bucket))
+	Require(c, RequestTokenIsAdmin(c))
 
 	logs, err := service.ListFileAccessLogs(file.ID, 100)
 	if err != nil {
