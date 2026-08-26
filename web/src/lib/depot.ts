@@ -174,27 +174,27 @@ export type BucketInput = {
 }
 
 export async function listStorageBackends() {
-  const response = await api.get<StorageBackend[]>("/internal/storage-backends")
+  const response = await api.get<StorageBackend[]>("/storage-backends")
   return response.data
 }
 
 export async function listStorageProviders() {
-  const response = await api.get<ProviderRegions[]>("/internal/storage-backends/providers")
+  const response = await api.get<ProviderRegions[]>("/storage-backends/providers")
   return response.data
 }
 
 export async function createStorageBackend(input: StorageBackendInput) {
-  const response = await api.post<StorageBackend>("/internal/storage-backends", input)
+  const response = await api.post<StorageBackend>("/storage-backends", input)
   return response.data
 }
 
 export async function updateStorageBackend(name: string, input: StorageBackendInput) {
-  const response = await api.patch<StorageBackend>(`/internal/storage-backends/${encodeURIComponent(name)}`, input)
+  const response = await api.patch<StorageBackend>(`/storage-backends/${encodeURIComponent(name)}`, input)
   return response.data
 }
 
 export async function deleteStorageBackend(name: string) {
-  await api.delete(`/internal/storage-backends/${encodeURIComponent(name)}`)
+  await api.delete(`/storage-backends/${encodeURIComponent(name)}`)
 }
 
 export async function listBuckets() {
@@ -208,27 +208,27 @@ export async function getBucket(name: string) {
 }
 
 export async function createBucket(input: BucketInput) {
-  const response = await api.post<Bucket>("/internal/buckets", input)
+  const response = await api.post<Bucket>("/buckets", input)
   return response.data
 }
 
 export async function updateBucket(name: string, input: Omit<BucketInput, "name">) {
-  const response = await api.put<Bucket>(`/internal/buckets/${encodeURIComponent(name)}`, input)
+  const response = await api.put<Bucket>(`/buckets/${encodeURIComponent(name)}`, input)
   return response.data
 }
 
 export async function deleteBucket(name: string) {
-  await api.delete(`/internal/buckets/${encodeURIComponent(name)}`)
+  await api.delete(`/buckets/${encodeURIComponent(name)}`)
 }
 
 export async function listBucketGrants(bucket: string) {
-  const response = await api.get<BucketGrant[]>(`/internal/buckets/${encodeURIComponent(bucket)}/grants`)
+  const response = await api.get<BucketGrant[]>(`/buckets/${encodeURIComponent(bucket)}/grants`)
   return response.data
 }
 
 export async function createBucketGrant(bucket: string, input: BucketGrantInput) {
   const response = await api.post<BucketGrant>(
-    `/internal/buckets/${encodeURIComponent(bucket)}/grants`,
+    `/buckets/${encodeURIComponent(bucket)}/grants`,
     input,
   )
   return response.data
@@ -240,14 +240,14 @@ export async function updateBucketGrant(
   input: Omit<BucketGrantInput, "client_id">,
 ) {
   const response = await api.patch<BucketGrant>(
-    `/internal/buckets/${encodeURIComponent(bucket)}/grants/${encodeURIComponent(clientID)}`,
+    `/buckets/${encodeURIComponent(bucket)}/grants/${encodeURIComponent(clientID)}`,
     input,
   )
   return response.data
 }
 
 export async function deleteBucketGrant(bucket: string, clientID: string) {
-  await api.delete(`/internal/buckets/${encodeURIComponent(bucket)}/grants/${encodeURIComponent(clientID)}`)
+  await api.delete(`/buckets/${encodeURIComponent(bucket)}/grants/${encodeURIComponent(clientID)}`)
 }
 
 export async function listFiles(
@@ -295,7 +295,7 @@ export async function createDownloadURL(bucket: string, id: string) {
 
 export async function listFileAccessLogs(bucket: string, id: string) {
   const response = await api.get<AccessLog[]>(
-    `/internal/buckets/${encodeURIComponent(bucket)}/files/${encodeURIComponent(id)}/access-logs`,
+    `/buckets/${encodeURIComponent(bucket)}/files/${encodeURIComponent(id)}/access-logs`,
   )
   return response.data
 }
@@ -311,12 +311,12 @@ export async function getActivity(days = 30) {
 }
 
 export async function listSentinelApplications() {
-  const response = await api.get<SentinelApplication[]>("/internal/applications")
+  const response = await api.get<SentinelApplication[]>("/applications")
   return response.data
 }
 
 export async function listSentinelGroups() {
-  const response = await api.get<SentinelGroup[]>("/internal/groups")
+  const response = await api.get<SentinelGroup[]>("/groups")
   return response.data
 }
 

@@ -50,49 +50,50 @@ func InitializeRoutes(router *gin.Engine) {
 	router.POST("/auth/logout", Logout)
 	router.GET("/users/@me", GetCurrentUser)
 
-	// Public surface: what a calling application can reach with its own
-	// Sentinel token, subject to the bucket's grants.
+	router.GET("/groups", ListSentinelGroups)
+	router.GET("/applications", ListSentinelApplications)
+
 	router.GET("/stats", GetStats)
 	router.GET("/stats/activity", GetActivityStats)
 	router.GET("/files/search", SearchFiles)
 
-	router.GET("/buckets", ListBuckets)
-	router.GET("/buckets/:bucketName", GetBucket)
+	router.GET("/storage-backends", ListStorageBackends)
+	router.GET("/storage-backends/providers", ListStorageProviders)
+	router.POST("/storage-backends", CreateStorageBackend)
+	router.PATCH("/storage-backends/:backendName", UpdateStorageBackend)
+	router.DELETE("/storage-backends/:backendName", DeleteStorageBackend)
 
+	router.GET("/buckets", ListBuckets)
+	router.POST("/buckets", CreateBucket)
+	router.GET("/buckets/:bucketName", GetBucket)
+	router.PUT("/buckets/:bucketName", UpdateBucket)
+	router.DELETE("/buckets/:bucketName", DeleteBucket)
+
+	router.GET("/buckets/:bucketName/grants", ListBucketGrants)
+	router.POST("/buckets/:bucketName/grants", CreateBucketGrant)
+	router.PATCH("/buckets/:bucketName/grants/:clientID", UpdateBucketGrant)
+	router.DELETE("/buckets/:bucketName/grants/:clientID", DeleteBucketGrant)
+
+	// File routes an application reaches with its own token, resolved by the
+	// bucket's grants.
 	router.GET("/buckets/:bucketName/files", ListFiles)
 	router.POST("/buckets/:bucketName/files", UploadFile)
 	router.GET("/buckets/:bucketName/files/:id", GetFile)
 	router.GET("/buckets/:bucketName/files/:id/content", GetFileContent)
+	router.GET("/buckets/:bucketName/files/:id/access-logs", GetFileAccessLogs)
 	router.POST("/buckets/:bucketName/files/:id/download-url", CreateDownloadURL)
 
 	router.POST("/buckets/:bucketName/uploads", InitiateUpload)
 	router.POST("/buckets/:bucketName/uploads/:id/complete", CompleteUpload)
 
-	// Internal surface: Depot's own web app. Requires a token minted for
-	// Depot's OAuth client whose entity is in the admin group.
+	// The same file operations for Depot's own web app, gated on a token minted
+	// for Depot's OAuth client whose entity is in DepotAdmins rather than on a
+	// bucket grant. Privileged file operations the application API deliberately
+	// does not expose — updating or deleting a file — belong here.
 	internal := router.Group("/internal", RequireInternal())
-
-	internal.GET("/groups", ListSentinelGroups)
-	internal.GET("/applications", ListSentinelApplications)
-
-	internal.GET("/storage-backends", ListStorageBackends)
-	internal.GET("/storage-backends/providers", ListStorageProviders)
-	internal.POST("/storage-backends", CreateStorageBackend)
-	internal.PATCH("/storage-backends/:backendName", UpdateStorageBackend)
-	internal.DELETE("/storage-backends/:backendName", DeleteStorageBackend)
-
-	internal.POST("/buckets", CreateBucket)
-	internal.PUT("/buckets/:bucketName", UpdateBucket)
-	internal.DELETE("/buckets/:bucketName", DeleteBucket)
-
-	internal.GET("/buckets/:bucketName/grants", ListBucketGrants)
-	internal.POST("/buckets/:bucketName/grants", CreateBucketGrant)
-	internal.PATCH("/buckets/:bucketName/grants/:clientID", UpdateBucketGrant)
-	internal.DELETE("/buckets/:bucketName/grants/:clientID", DeleteBucketGrant)
 
 	internal.POST("/buckets/:bucketName/files", UploadFile)
 	internal.GET("/buckets/:bucketName/files/:id/content", GetFileContent)
-	internal.GET("/buckets/:bucketName/files/:id/access-logs", GetFileAccessLogs)
 	internal.POST("/buckets/:bucketName/files/:id/download-url", CreateDownloadURL)
 }
 
@@ -220,9 +221,9 @@ func RequestTokenIsAdmin(c *gin.Context) bool {
 	return RequestTokenIsFirstParty(c) && RequestTokenHasGroupName(c, AdminGroupName)
 }
 
-// RequireInternal gates the /internal surface, which exists for Depot's own web
-// app: uploads and downloads from the UI, plus all bucket, grant and storage
-// backend management. Handlers under it can treat the request as authorized.
+// RequireInternal gates the /internal surface: the file operations Depot's own
+// web app performs, authorized by administrator identity rather than by a
+// bucket grant. Handlers under it can treat the request as authorized.
 func RequireInternal() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !RequestTokenExists(c) {
