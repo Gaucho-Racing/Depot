@@ -147,7 +147,7 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle>Storage by bucket</CardTitle>
@@ -190,7 +190,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Top uploaders</CardTitle>
-            <CardDescription>Applications and users hosting the most files.</CardDescription>
+            <CardDescription>Entities hosting the most files.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             {statsQuery.isLoading ? (
@@ -219,6 +219,43 @@ export default function DashboardPage() {
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {entity.file_count} file{entity.file_count === 1 ? "" : "s"} ·{" "}
                       {formatBytes(entity.total_bytes)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Top applications</CardTitle>
+            <CardDescription>Files by the client that uploaded them.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            {statsQuery.isLoading ? (
+              <div className="space-y-3 px-6 pb-6">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-8 w-full" />
+                ))}
+              </div>
+            ) : (stats?.top_applications ?? []).length === 0 ? (
+              <p className="px-6 py-6 text-center text-sm text-muted-foreground">
+                No application uploads recorded yet.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {stats?.top_applications.map((app, index) => (
+                  <li key={app.client_id} className="flex items-center gap-3 px-6 py-3 text-sm">
+                    <span className="w-5 shrink-0 font-mono text-xs text-muted-foreground">
+                      {index + 1}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-mono text-xs">
+                      {app.client_id}
+                    </span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {app.file_count} file{app.file_count === 1 ? "" : "s"} ·{" "}
+                      {formatBytes(app.total_bytes)}
                     </span>
                   </li>
                 ))}

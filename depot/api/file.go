@@ -142,7 +142,7 @@ func UploadFile(c *gin.Context) {
 	if !ok {
 		return
 	}
-	Require(c, RequestTokenCanWriteBucket(c, bucket))
+	Require(c, RequestTokenCanUploadToBucket(c, bucket))
 
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, config.MaxProxyUploadBytesLimit)
 	formFile, err := c.FormFile("file")
@@ -161,7 +161,9 @@ func UploadFile(c *gin.Context) {
 		Path:              c.PostForm("path"),
 		ContentType:       c.PostForm("content_type"),
 		CreatedByEntityID: GetRequestTokenEntityID(c),
+		CreatedByClientID: GetRequestTokenClientID(c),
 		UpdatedByEntityID: GetRequestTokenEntityID(c),
+		UpdatedByClientID: GetRequestTokenClientID(c),
 	}
 	if file.Name == "" {
 		file.Name = formFile.Filename
@@ -200,7 +202,7 @@ func UploadFile(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	service.RecordAccess(created, model.AccessActionUpload, GetRequestTokenEntityID(c), false)
+	service.RecordAccess(created, model.AccessActionUpload, requestActor(c))
 	c.JSON(http.StatusCreated, created)
 }
 
@@ -264,77 +266,10 @@ func GetFileContent(c *gin.Context) {
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
-	service.RecordAccess(file, model.AccessActionDownload, GetRequestTokenEntityID(c), !RequestTokenExists(c))
+	service.RecordAccess(file, model.AccessActionDownload, requestActor(c))
 	c.DataFromReader(http.StatusOK, file.SizeBytes, contentType, body, map[string]string{
 		"Content-Disposition": fmt.Sprintf("inline; filename=%q", file.Name),
 	})
-}
-
-func UpdateFile(c *gin.Context) {
-	bucket, ok := findBucket(c)
-	if !ok {
-		return
-	}
-	Require(c, RequestTokenCanWriteBucket(c, bucket))
-
-	file, ok := findFile(c, bucket)
-	if !ok {
-		return
-	}
-
-	var req struct {
-		Name   *string            `json:"name"`
-		Path   *string            `json:"path"`
-		Public *bool              `json:"public"`
-		Tags   *map[string]string `json:"tags"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if req.Name != nil {
-		if *req.Name == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "name cannot be empty"})
-			return
-		}
-		file.Name = *req.Name
-	}
-	if req.Path != nil {
-		file.Path = *req.Path
-	}
-	if req.Public != nil {
-		file.Public = *req.Public
-	}
-	if req.Tags != nil {
-		file.Tags = *req.Tags
-	}
-	file.UpdatedByEntityID = GetRequestTokenEntityID(c)
-
-	updated, err := service.UpdateFile(file)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, updated)
-}
-
-func DeleteFile(c *gin.Context) {
-	bucket, ok := findBucket(c)
-	if !ok {
-		return
-	}
-	Require(c, RequestTokenCanWriteBucket(c, bucket))
-
-	file, ok := findFile(c, bucket)
-	if !ok {
-		return
-	}
-	if err := service.DeleteFile(c.Request.Context(), file); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	service.RecordAccess(file, model.AccessActionDelete, GetRequestTokenEntityID(c), false)
-	c.JSON(http.StatusOK, gin.H{"message": "file deleted"})
 }
 
 func CreateDownloadURL(c *gin.Context) {
@@ -358,7 +293,7 @@ func CreateDownloadURL(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	service.RecordAccess(file, model.AccessActionPresignDownload, GetRequestTokenEntityID(c), !RequestTokenExists(c))
+	service.RecordAccess(file, model.AccessActionPresignDownload, requestActor(c))
 	c.JSON(http.StatusOK, gin.H{
 		"url":        request.URL,
 		"method":     request.Method,
@@ -371,16 +306,16 @@ func InitiateUpload(c *gin.Context) {
 	if !ok {
 		return
 	}
-	Require(c, RequestTokenCanWriteBucket(c, bucket))
+	Require(c, RequestTokenCanUploadToBucket(c, bucket))
 
 	var req struct {
-		Name        string            `json:"name"`
-		Path        string            `json:"path"`
-		ContentType string            `json:"content_type"`
-		Public      bool              `json:"public"`
-		Tags        map[string]string `json:"tags"`
-		StorageBackend string         `json:"storage_backend"`
-		Replicas       []string       `json:"replicas"`
+		Name           string            `json:"name"`
+		Path           string            `json:"path"`
+		ContentType    string            `json:"content_type"`
+		Public         bool              `json:"public"`
+		Tags           map[string]string `json:"tags"`
+		StorageBackend string            `json:"storage_backend"`
+		Replicas       []string          `json:"replicas"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -398,7 +333,9 @@ func InitiateUpload(c *gin.Context) {
 		Public:            req.Public,
 		Tags:              req.Tags,
 		CreatedByEntityID: GetRequestTokenEntityID(c),
+		CreatedByClientID: GetRequestTokenClientID(c),
 		UpdatedByEntityID: GetRequestTokenEntityID(c),
+		UpdatedByClientID: GetRequestTokenClientID(c),
 	}
 	created, request, err := service.InitiateUpload(c.Request.Context(), bucket, file, req.StorageBackend, req.Replicas)
 	if err != nil {
@@ -418,7 +355,7 @@ func CompleteUpload(c *gin.Context) {
 	if !ok {
 		return
 	}
-	Require(c, RequestTokenCanWriteBucket(c, bucket))
+	Require(c, RequestTokenCanUploadToBucket(c, bucket))
 
 	file, ok := findFile(c, bucket)
 	if !ok {
@@ -428,13 +365,18 @@ func CompleteUpload(c *gin.Context) {
 		c.JSON(http.StatusOK, file)
 		return
 	}
+	if !RequestTokenIsAdmin(c) && file.CreatedByClientID != GetRequestTokenClientID(c) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "this upload was initiated by a different application"})
+		return
+	}
 
 	file.UpdatedByEntityID = GetRequestTokenEntityID(c)
+	file.UpdatedByClientID = GetRequestTokenClientID(c)
 	completed, err := service.CompleteUpload(c.Request.Context(), file)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	service.RecordAccess(completed, model.AccessActionPresignUpload, GetRequestTokenEntityID(c), false)
+	service.RecordAccess(completed, model.AccessActionPresignUpload, requestActor(c))
 	c.JSON(http.StatusOK, completed)
 }

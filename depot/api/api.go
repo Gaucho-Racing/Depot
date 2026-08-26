@@ -10,6 +10,7 @@ import (
 	"github.com/gaucho-racing/depot/depot/model"
 	"github.com/gaucho-racing/depot/depot/pkg/logger"
 	"github.com/gaucho-racing/depot/depot/pkg/sentinel"
+	"github.com/gaucho-racing/depot/depot/service"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
@@ -66,11 +67,14 @@ func InitializeRoutes(router *gin.Engine) {
 	router.PUT("/buckets/:bucketName", UpdateBucket)
 	router.DELETE("/buckets/:bucketName", DeleteBucket)
 
+	router.GET("/buckets/:bucketName/grants", ListBucketGrants)
+	router.POST("/buckets/:bucketName/grants", CreateBucketGrant)
+	router.PATCH("/buckets/:bucketName/grants/:clientID", UpdateBucketGrant)
+	router.DELETE("/buckets/:bucketName/grants/:clientID", DeleteBucketGrant)
+
 	router.GET("/buckets/:bucketName/files", ListFiles)
 	router.POST("/buckets/:bucketName/files", UploadFile)
 	router.GET("/buckets/:bucketName/files/:id", GetFile)
-	router.PUT("/buckets/:bucketName/files/:id", UpdateFile)
-	router.DELETE("/buckets/:bucketName/files/:id", DeleteFile)
 	router.GET("/buckets/:bucketName/files/:id/content", GetFileContent)
 	router.GET("/buckets/:bucketName/files/:id/access-logs", GetFileAccessLogs)
 	router.POST("/buckets/:bucketName/files/:id/download-url", CreateDownloadURL)
@@ -173,13 +177,30 @@ func RequestTokenHasGroupName(c *gin.Context, groupName string) bool {
 	return false
 }
 
+// RequestTokenIsFirstParty reports whether the token was minted for Depot's
+// own Sentinel application, i.e. a human signed in through the web UI. Every
+// Sentinel token carries exactly one audience — the client_id of the
+// application it was issued for — so the audience is what separates Depot's
+// own control plane from a calling application's data plane.
+func RequestTokenIsFirstParty(c *gin.Context) bool {
+	if config.SentinelClientID == "" {
+		return false
+	}
+	return GetRequestTokenClientID(c) == config.SentinelClientID
+}
+
+// RequestTokenIsAdmin gates the control plane: bucket and storage backend
+// management. Deliberately first-party only — an application token can never
+// reshape Depot regardless of what its entity's group memberships say.
+// sentinel:all remains as first-party break-glass for Sentinel's own tooling.
 func RequestTokenIsAdmin(c *gin.Context) bool {
 	if !RequestTokenExists(c) {
 		return false
 	}
-	return RequestTokenHasScope(c, "depot:all") ||
-		RequestTokenHasScope(c, "sentinel:all") ||
-		RequestTokenHasGroupName(c, "Admins")
+	if RequestTokenHasScope(c, "sentinel:all") {
+		return true
+	}
+	return RequestTokenIsFirstParty(c) && RequestTokenHasGroupName(c, "Admins")
 }
 
 func RequestTokenHasAnyGroupName(c *gin.Context, groupNames []string) bool {
@@ -191,27 +212,35 @@ func RequestTokenHasAnyGroupName(c *gin.Context, groupNames []string) bool {
 	return false
 }
 
-func RequestTokenCanWriteBucket(c *gin.Context, bucket model.Bucket) bool {
+// RequestTokenCanReadBucket and RequestTokenCanUploadToBucket are the data
+// plane. First-party tokens resolve against the bucket's Sentinel groups;
+// everything else resolves against the bucket's application grants. The two
+// paths never mix, so a user's group membership cannot leak bucket access to
+// whichever application happened to mint their token.
+func RequestTokenCanReadBucket(c *gin.Context, bucket model.Bucket) bool {
 	if !RequestTokenExists(c) {
 		return false
 	}
 	if RequestTokenIsAdmin(c) {
 		return true
 	}
-	if RequestTokenHasScope(c, "depot:"+bucket.Name+":write") {
-		return true
+	if RequestTokenIsFirstParty(c) {
+		return RequestTokenHasAnyGroupName(c, bucket.AccessGroupNames)
 	}
-	return RequestTokenHasAnyGroupName(c, bucket.AccessGroupNames)
+	return service.ClientCanReadBucket(bucket.ID, GetRequestTokenClientID(c))
 }
 
-func RequestTokenCanReadBucket(c *gin.Context, bucket model.Bucket) bool {
+func RequestTokenCanUploadToBucket(c *gin.Context, bucket model.Bucket) bool {
 	if !RequestTokenExists(c) {
 		return false
 	}
-	if RequestTokenCanWriteBucket(c, bucket) {
+	if RequestTokenIsAdmin(c) {
 		return true
 	}
-	return RequestTokenHasScope(c, "depot:"+bucket.Name+":read")
+	if RequestTokenIsFirstParty(c) {
+		return RequestTokenHasAnyGroupName(c, bucket.AccessGroupNames)
+	}
+	return service.ClientCanWriteBucket(bucket.ID, GetRequestTokenClientID(c))
 }
 
 func GetRequestToken(c *gin.Context) string {
@@ -227,6 +256,36 @@ func GetRequestTokenScopes(c *gin.Context) string {
 func GetRequestTokenAudience(c *gin.Context) string {
 	audience, _ := c.Get("Auth-Audience")
 	return contextString(audience)
+}
+
+// GetRequestTokenClientID is the audience under the name it actually carries:
+// the Sentinel client_id of the application the token was issued for.
+func GetRequestTokenClientID(c *gin.Context) string {
+	return GetRequestTokenAudience(c)
+}
+
+// requestActor resolves the principal behind the current request for audit
+// records: the entity, the application whose token was presented, and the
+// credential kind.
+func requestActor(c *gin.Context) service.Actor {
+	return service.Actor{
+		EntityID: GetRequestTokenEntityID(c),
+		ClientID: GetRequestTokenClientID(c),
+		Type:     GetRequestActorType(c),
+	}
+}
+
+// GetRequestActorType classifies the caller from Sentinel's `type` claim,
+// which is set to service_account on service-account tokens and absent on
+// user tokens.
+func GetRequestActorType(c *gin.Context) model.ActorType {
+	if !RequestTokenExists(c) {
+		return model.ActorTypeAnonymous
+	}
+	if claimString(GetRequestTokenClaims(c), "type") == "service_account" {
+		return model.ActorTypeServiceAccount
+	}
+	return model.ActorTypeUser
 }
 
 func GetRequestTokenClaims(c *gin.Context) map[string]interface{} {

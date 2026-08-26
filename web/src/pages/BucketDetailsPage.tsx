@@ -5,6 +5,7 @@ import { useNavigate, useParams } from "react-router-dom"
 import { toast } from "sonner"
 
 import { BucketFormDialog } from "@/components/BucketFormDialog"
+import { BucketGrantsCard } from "@/components/BucketGrantsCard"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { FileSheet } from "@/components/FileSheet"
 import { PageContainer, PageHeader } from "@/components/PageContainer"
@@ -150,6 +151,8 @@ export default function BucketDetailsPage() {
         </div>
       )}
 
+      {isAdmin && bucket && <BucketGrantsCard bucketName={bucketName} />}
+
       <div className="mb-6 flex h-11 max-w-xl min-w-0 items-center gap-2 rounded-lg bg-card px-3 shadow-sm">
         <Search className="size-4 shrink-0 text-muted-foreground" />
         <Input
@@ -214,7 +217,7 @@ export default function BucketDetailsPage() {
         </Card>
       )}
 
-      <FileSheet file={selectedFile} canWrite={canWrite} onClose={() => setSelectedFile(null)} />
+      <FileSheet file={selectedFile} onClose={() => setSelectedFile(null)} />
     </PageContainer>
   )
 }

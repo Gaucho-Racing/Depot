@@ -57,6 +57,7 @@ func Init() {
 		&model.AccessLog{},
 		&model.StorageBackend{},
 		&model.FileReplica{},
+		&model.BucketGrant{},
 	); err != nil {
 		logger.SugarLogger.Fatalf("failed to run database migrations: %v", err)
 		return

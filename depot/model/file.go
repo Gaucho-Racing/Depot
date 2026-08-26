@@ -25,7 +25,9 @@ type File struct {
 	StorageKey        string            `json:"-"`
 	Replicas          []FileReplica     `json:"replicas" gorm:"-"`
 	CreatedByEntityID string            `json:"created_by_entity_id" gorm:"index"`
+	CreatedByClientID string            `json:"created_by_client_id" gorm:"index"`
 	UpdatedByEntityID string            `json:"updated_by_entity_id" gorm:"index"`
+	UpdatedByClientID string            `json:"updated_by_client_id" gorm:"index"`
 	CreatedAt         time.Time         `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt         time.Time         `json:"updated_at" gorm:"autoUpdateTime"`
 }
