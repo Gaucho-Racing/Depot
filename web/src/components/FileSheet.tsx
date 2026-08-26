@@ -96,7 +96,6 @@ export function FileSheet({
                 <Row label="Path" value={file.path} mono />
                 <Row label="Content type" value={file.content_type} />
                 <Row label="Size" value={formatBytes(file.size_bytes)} />
-                <Row label="Checksum" value={file.checksum} mono />
                 <Row label="Storage backend" value={file.storage_backend} mono />
                 <Row label="Uploaded by" value={file.created_by_entity_id} mono />
                 <Row label="Uploaded via" value={file.created_by_client_id} mono />

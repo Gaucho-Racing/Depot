@@ -10,7 +10,6 @@ import (
 
 type ObjectInfo struct {
 	SizeBytes   int64
-	Checksum    string
 	ContentType string
 }
 

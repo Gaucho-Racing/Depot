@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"time"
@@ -156,13 +154,11 @@ func UploadFile(ctx context.Context, bucket model.Bucket, file model.File, body 
 	file.StorageKey = bucket.Name + "/" + file.ID
 	file.Status = model.FileStatusActive
 
-	hasher := sha256.New()
-	counter := &countingReader{reader: io.TeeReader(body, hasher)}
+	counter := &countingReader{reader: body}
 	if err := backend.Put(ctx, file.StorageKey, counter, file.ContentType); err != nil {
 		return model.File{}, fmt.Errorf("failed to write file to storage: %w", err)
 	}
 	file.SizeBytes = counter.count
-	file.Checksum = "sha256:" + hex.EncodeToString(hasher.Sum(nil))
 
 	if err := database.DB.Create(&file).Error; err != nil {
 		if deleteErr := backend.Delete(ctx, file.StorageKey); deleteErr != nil {
@@ -219,7 +215,6 @@ func CompleteUpload(ctx context.Context, file model.File) (model.File, error) {
 	}
 
 	file.SizeBytes = info.SizeBytes
-	file.Checksum = "etag:" + info.Checksum
 	if file.ContentType == "" {
 		file.ContentType = info.ContentType
 	}

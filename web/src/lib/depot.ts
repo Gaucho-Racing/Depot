@@ -51,7 +51,6 @@ export type DepotFile = {
   path: string
   content_type: string
   size_bytes: number
-  checksum: string
   status: "PENDING" | "ACTIVE"
   public: boolean
   tags: Record<string, string> | null

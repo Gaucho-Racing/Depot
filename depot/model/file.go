@@ -17,7 +17,6 @@ type File struct {
 	Path              string            `json:"path" gorm:"index"`
 	ContentType       string            `json:"content_type"`
 	SizeBytes         int64             `json:"size_bytes"`
-	Checksum          string            `json:"checksum"`
 	Status            FileStatus        `json:"status" gorm:"index"`
 	Public            bool              `json:"public"`
 	Tags              map[string]string `json:"tags" gorm:"type:jsonb;serializer:json"`
