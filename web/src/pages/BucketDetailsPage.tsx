@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { FileIcon, Globe, Lock, Pencil, Search, Upload, Users } from "lucide-react"
+import { FileIcon, Globe, Lock, Pencil, Search, Upload } from "lucide-react"
 import { useState } from "react"
 import { Link, useParams } from "react-router-dom"
 
@@ -55,13 +55,19 @@ export default function BucketDetailsPage() {
   const bucket = bucketQuery.data
   const files = filesQuery.data ?? []
   const bucketStats = statsQuery.data?.buckets.find((entry) => entry.bucket_id === bucket?.id)
-  const grantCount = grantsQuery.data?.length ?? 0
 
+  const grants = grantsQuery.data
+  // Grants are admin-only, so without them the counts are unknown rather than zero.
+  const appCount = (count: number) =>
+    count === 0 ? "Admins only" : `${count} application${count === 1 ? "" : "s"}`
   const readAccess = bucket?.allow_authenticated_read
     ? "Any application"
-    : grantCount > 0
-      ? `${grantCount} application${grantCount === 1 ? "" : "s"}`
-      : "Admins only"
+    : grants
+      ? appCount(grants.length)
+      : "—"
+  const writeAccess = grants
+    ? appCount(grants.filter((grant) => grant.access === "WRITE").length)
+    : "—"
 
   return (
     <PageContainer>
@@ -94,32 +100,25 @@ export default function BucketDetailsPage() {
         }
       />
 
-      <div className="mb-6 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-2 lg:grid-cols-3 xl:grid-cols-5">
         <SummaryTile label="Files" value={String(bucketStats?.file_count ?? 0)} />
         <SummaryTile label="Stored" value={formatBytes(bucketStats?.total_bytes ?? 0)} />
         <SummaryTile label="Read access" value={readAccess} />
+        <SummaryTile label="Write access" value={writeAccess} />
         <SummaryTile
           label="Public files"
           value={bucket?.allow_public_files ? "Allowed" : "Not allowed"}
         />
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border border-input/80 px-2.5 sm:max-w-sm">
-          <Search className="size-4 shrink-0 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search files by name or path"
-            className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
-          />
-        </div>
-        {bucket?.allow_authenticated_read && (
-          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Users className="size-3.5" />
-            Readable by any authenticated application
-          </span>
-        )}
+      <div className="mb-4 flex h-9 min-w-0 items-center gap-2 rounded-lg border border-input/80 px-2.5 sm:max-w-sm">
+        <Search className="size-4 shrink-0 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search files by name or path"
+          className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+        />
       </div>
 
       {filesQuery.isLoading ? (
