@@ -202,9 +202,12 @@ func RequestTokenIsFirstParty(c *gin.Context) bool {
 	return GetRequestTokenClientID(c) == config.SentinelClientID
 }
 
+// AdminGroupName is the Sentinel group whose members administer Depot.
+const AdminGroupName = "DepotAdmins"
+
 // RequestTokenIsAdmin authorizes Depot's internal surface. Both halves matter:
 // the token must have been minted for Depot's own OAuth client, and its entity
-// must belong to the configured admin group. An application token can never
+// must belong to the DepotAdmins group. An application token can never
 // reshape Depot regardless of what its entity's group memberships say.
 // sentinel:all remains as first-party break-glass for Sentinel's own tooling.
 func RequestTokenIsAdmin(c *gin.Context) bool {
@@ -214,7 +217,7 @@ func RequestTokenIsAdmin(c *gin.Context) bool {
 	if RequestTokenHasScope(c, "sentinel:all") {
 		return true
 	}
-	return RequestTokenIsFirstParty(c) && RequestTokenHasGroupName(c, config.AdminGroup)
+	return RequestTokenIsFirstParty(c) && RequestTokenHasGroupName(c, AdminGroupName)
 }
 
 // RequireInternal gates the /internal surface, which exists for Depot's own web
