@@ -48,7 +48,6 @@ export default function BucketDetailsPage() {
   const grantsQuery = useQuery({
     queryKey: ["grants", bucketName],
     queryFn: () => listBucketGrants(bucketName),
-    enabled: isAdmin,
   })
 
   const bucket = bucketQuery.data
@@ -56,7 +55,7 @@ export default function BucketDetailsPage() {
   const bucketStats = statsQuery.data?.buckets.find((entry) => entry.bucket_id === bucket?.id)
 
   const grants = grantsQuery.data
-  // Grants are admin-only, so without them the counts are unknown rather than zero.
+  // Undefined while the request is in flight — unknown rather than zero.
   const appCount = (count: number) =>
     count === 0 ? "Admins only" : `${count} application${count === 1 ? "" : "s"}`
   const readAccess = bucket?.allow_authenticated_read

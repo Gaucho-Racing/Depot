@@ -31,7 +31,7 @@ func findBucketGrant(c *gin.Context, bucket model.Bucket) (model.BucketGrant, bo
 }
 
 func ListBucketGrants(c *gin.Context) {
-	Require(c, RequestTokenIsAdmin(c))
+	Require(c, RequestTokenExists(c))
 
 	bucket, ok := findBucket(c)
 	if !ok {
