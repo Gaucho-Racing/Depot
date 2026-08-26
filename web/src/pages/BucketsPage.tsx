@@ -14,8 +14,7 @@ import { listBuckets } from "@/lib/depot"
 
 export default function BucketsPage() {
   const [search, setSearch] = useState("")
-  const { user } = useAuth()
-  const isAdmin = user?.groups?.includes("Admins") ?? false
+  const { isAdmin } = useAuth()
 
   const bucketsQuery = useQuery({ queryKey: ["buckets"], queryFn: listBuckets })
 

@@ -30,11 +30,16 @@ func LoginWithSentinel(c *gin.Context) {
 
 func GetSession(c *gin.Context) {
 	Require(c, RequestTokenExists(c))
+	// is_admin is resolved here so the web app never has to know which group
+	// name Depot is configured to trust.
 	c.JSON(http.StatusOK, gin.H{
-		"entity_id": GetRequestTokenEntityID(c),
-		"user_id":   GetRequestTokenUserID(c),
-		"scope":     GetRequestTokenScopes(c),
-		"groups":    GetRequestTokenGroupNames(c),
+		"entity_id":   GetRequestTokenEntityID(c),
+		"user_id":     GetRequestTokenUserID(c),
+		"client_id":   GetRequestTokenClientID(c),
+		"scope":       GetRequestTokenScopes(c),
+		"groups":      GetRequestTokenGroupNames(c),
+		"first_party": RequestTokenIsFirstParty(c),
+		"is_admin":    RequestTokenIsAdmin(c),
 	})
 }
 

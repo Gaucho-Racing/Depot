@@ -45,6 +45,10 @@ func Verify() {
 	if SentinelClientID == "" || SentinelClientSecret == "" {
 		logger.SugarLogger.Warnf("SENTINEL_CLIENT_ID / SENTINEL_CLIENT_SECRET are not set, web login will be unavailable and no token will resolve as first-party (admin access unreachable)")
 	}
+	if AdminGroup == "" {
+		AdminGroup = "DepotAdmins"
+		logger.SugarLogger.Infof("DEPOT_ADMIN_GROUP is not set, defaulting to %s", AdminGroup)
+	}
 	if SentinelSAToken == "" {
 		logger.SugarLogger.Warnf("SENTINEL_SA_TOKEN is not set, the Sentinel application list will be unavailable")
 	}

@@ -31,8 +31,7 @@ function SummaryTile({ label, value }: { label: string; value: string }) {
 
 export default function BucketDetailsPage() {
   const { bucketName = "" } = useParams()
-  const { user } = useAuth()
-  const isAdmin = user?.groups?.includes("Admins") ?? false
+  const { isAdmin } = useAuth()
 
   const [search, setSearch] = useState("")
   const [selectedFile, setSelectedFile] = useState<DepotFile | null>(null)

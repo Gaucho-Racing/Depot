@@ -174,27 +174,27 @@ export type BucketInput = {
 }
 
 export async function listStorageBackends() {
-  const response = await api.get<StorageBackend[]>("/storage-backends")
+  const response = await api.get<StorageBackend[]>("/internal/storage-backends")
   return response.data
 }
 
 export async function listStorageProviders() {
-  const response = await api.get<ProviderRegions[]>("/storage-backends/providers")
+  const response = await api.get<ProviderRegions[]>("/internal/storage-backends/providers")
   return response.data
 }
 
 export async function createStorageBackend(input: StorageBackendInput) {
-  const response = await api.post<StorageBackend>("/storage-backends", input)
+  const response = await api.post<StorageBackend>("/internal/storage-backends", input)
   return response.data
 }
 
 export async function updateStorageBackend(name: string, input: StorageBackendInput) {
-  const response = await api.patch<StorageBackend>(`/storage-backends/${encodeURIComponent(name)}`, input)
+  const response = await api.patch<StorageBackend>(`/internal/storage-backends/${encodeURIComponent(name)}`, input)
   return response.data
 }
 
 export async function deleteStorageBackend(name: string) {
-  await api.delete(`/storage-backends/${encodeURIComponent(name)}`)
+  await api.delete(`/internal/storage-backends/${encodeURIComponent(name)}`)
 }
 
 export async function listBuckets() {
@@ -208,27 +208,27 @@ export async function getBucket(name: string) {
 }
 
 export async function createBucket(input: BucketInput) {
-  const response = await api.post<Bucket>("/buckets", input)
+  const response = await api.post<Bucket>("/internal/buckets", input)
   return response.data
 }
 
 export async function updateBucket(name: string, input: Omit<BucketInput, "name">) {
-  const response = await api.put<Bucket>(`/buckets/${encodeURIComponent(name)}`, input)
+  const response = await api.put<Bucket>(`/internal/buckets/${encodeURIComponent(name)}`, input)
   return response.data
 }
 
 export async function deleteBucket(name: string) {
-  await api.delete(`/buckets/${encodeURIComponent(name)}`)
+  await api.delete(`/internal/buckets/${encodeURIComponent(name)}`)
 }
 
 export async function listBucketGrants(bucket: string) {
-  const response = await api.get<BucketGrant[]>(`/buckets/${encodeURIComponent(bucket)}/grants`)
+  const response = await api.get<BucketGrant[]>(`/internal/buckets/${encodeURIComponent(bucket)}/grants`)
   return response.data
 }
 
 export async function createBucketGrant(bucket: string, input: BucketGrantInput) {
   const response = await api.post<BucketGrant>(
-    `/buckets/${encodeURIComponent(bucket)}/grants`,
+    `/internal/buckets/${encodeURIComponent(bucket)}/grants`,
     input,
   )
   return response.data
@@ -240,14 +240,14 @@ export async function updateBucketGrant(
   input: Omit<BucketGrantInput, "client_id">,
 ) {
   const response = await api.patch<BucketGrant>(
-    `/buckets/${encodeURIComponent(bucket)}/grants/${encodeURIComponent(clientID)}`,
+    `/internal/buckets/${encodeURIComponent(bucket)}/grants/${encodeURIComponent(clientID)}`,
     input,
   )
   return response.data
 }
 
 export async function deleteBucketGrant(bucket: string, clientID: string) {
-  await api.delete(`/buckets/${encodeURIComponent(bucket)}/grants/${encodeURIComponent(clientID)}`)
+  await api.delete(`/internal/buckets/${encodeURIComponent(bucket)}/grants/${encodeURIComponent(clientID)}`)
 }
 
 export async function listFiles(
@@ -276,7 +276,7 @@ export async function uploadFile(
   if (input.path) form.append("path", input.path)
   if (input.public !== undefined) form.append("public", String(input.public))
   if (input.tags && Object.keys(input.tags).length > 0) form.append("tags", JSON.stringify(input.tags))
-  const response = await api.post<DepotFile>(`/buckets/${encodeURIComponent(bucket)}/files`, form, {
+  const response = await api.post<DepotFile>(`/internal/buckets/${encodeURIComponent(bucket)}/files`, form, {
     onUploadProgress: (event) => {
       if (onProgress && event.total) {
         onProgress(Math.round((event.loaded / event.total) * 100))
@@ -288,14 +288,14 @@ export async function uploadFile(
 
 export async function createDownloadURL(bucket: string, id: string) {
   const response = await api.post<{ url: string; method: string; expires_at: string }>(
-    `/buckets/${encodeURIComponent(bucket)}/files/${encodeURIComponent(id)}/download-url`,
+    `/internal/buckets/${encodeURIComponent(bucket)}/files/${encodeURIComponent(id)}/download-url`,
   )
   return response.data
 }
 
 export async function listFileAccessLogs(bucket: string, id: string) {
   const response = await api.get<AccessLog[]>(
-    `/buckets/${encodeURIComponent(bucket)}/files/${encodeURIComponent(id)}/access-logs`,
+    `/internal/buckets/${encodeURIComponent(bucket)}/files/${encodeURIComponent(id)}/access-logs`,
   )
   return response.data
 }
@@ -311,12 +311,12 @@ export async function getActivity(days = 30) {
 }
 
 export async function listSentinelApplications() {
-  const response = await api.get<SentinelApplication[]>("/applications")
+  const response = await api.get<SentinelApplication[]>("/internal/applications")
   return response.data
 }
 
 export async function listSentinelGroups() {
-  const response = await api.get<SentinelGroup[]>("/groups")
+  const response = await api.get<SentinelGroup[]>("/internal/groups")
   return response.data
 }
 
