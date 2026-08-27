@@ -292,6 +292,50 @@ export async function uploadFile(
   return response.data
 }
 
+// filenameFromDisposition pulls the name Depot chose out of the response
+// header, preferring the RFC 5987 form when present.
+function filenameFromDisposition(header: string | undefined) {
+  if (!header) return undefined
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header)
+  if (encoded) return decodeURIComponent(encoded[1])
+  const plain = /filename="?([^";]+)"?/i.exec(header)
+  return plain?.[1]
+}
+
+/**
+ * downloadFile streams a file through Depot rather than handing the browser a
+ * presigned URL. Depot sees the transfer, so the access log records a real
+ * download and a missing primary object falls back to a replica. The response
+ * is buffered in memory, so this is the wrong choice for very large objects —
+ * createDownloadURL is the direct-from-storage alternative.
+ */
+export async function downloadFile(bucket: string, id: string, onProgress?: (percent: number) => void) {
+  const response = await api.get<Blob>(
+    `/buckets/${encodeURIComponent(bucket)}/files/${encodeURIComponent(id)}/content`,
+    {
+      responseType: "blob",
+      onDownloadProgress: (event) => {
+        if (onProgress && event.total) {
+          onProgress(Math.round((event.loaded / event.total) * 100))
+        }
+      },
+    },
+  )
+
+  const filename =
+    filenameFromDisposition(response.headers["content-disposition"] as string | undefined) ?? id
+  const objectUrl = URL.createObjectURL(response.data)
+  const anchor = document.createElement("a")
+  anchor.href = objectUrl
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  // Revoking synchronously can cancel the save in some browsers.
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000)
+  return filename
+}
+
 export async function createDownloadURL(bucket: string, id: string) {
   const response = await api.post<{ url: string; method: string; expires_at: string }>(
     `/buckets/${encodeURIComponent(bucket)}/files/${encodeURIComponent(id)}/download-url`,

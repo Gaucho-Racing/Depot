@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
-import { Download, Globe, Lock } from "lucide-react"
+import { Download, Globe, Loader2, Lock } from "lucide-react"
+import { useState } from "react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -13,7 +14,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import {
-  createDownloadURL,
+  downloadFile,
   errorMessage,
   formatBytes,
   listFileAccessLogs,
@@ -52,12 +53,16 @@ export function FileSheet({
     enabled: !!file,
   })
 
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null)
+
   async function handleDownload() {
+    setDownloadProgress(0)
     try {
-      const { url } = await createDownloadURL(file!.bucket_name, file!.id)
-      window.open(url, "_blank", "noopener")
+      await downloadFile(file!.bucket_name, file!.id, setDownloadProgress)
     } catch (error) {
-      toast.error(errorMessage(error, "Failed to create download link"))
+      toast.error(errorMessage(error, "Download failed"))
+    } finally {
+      setDownloadProgress(null)
     }
   }
 
@@ -84,9 +89,13 @@ export function FileSheet({
 
             <div className="space-y-4 px-4 pb-6">
               <div className="flex gap-2">
-                <Button size="sm" onClick={handleDownload}>
-                  <Download className="size-4" />
-                  Download
+                <Button size="sm" onClick={handleDownload} disabled={downloadProgress !== null}>
+                  {downloadProgress === null ? (
+                    <Download className="size-4" />
+                  ) : (
+                    <Loader2 className="size-4 animate-spin" />
+                  )}
+                  {downloadProgress === null ? "Download" : `${downloadProgress}%`}
                 </Button>
               </div>
 
