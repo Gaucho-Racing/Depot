@@ -1,9 +1,11 @@
 package api
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -48,6 +50,9 @@ func findFile(c *gin.Context, bucket model.Bucket) (model.File, bool) {
 func publiclyReadable(bucket model.Bucket, file model.File) bool {
 	return file.Public && bucket.AllowPublicFiles
 }
+
+// sniffLen is what http.DetectContentType inspects.
+const sniffLen = 512
 
 func splitBackendNames(value string) []string {
 	names := []string{}
@@ -165,7 +170,7 @@ func UploadFile(c *gin.Context) {
 	}
 
 	file := model.File{
-		Name:              c.PostForm("name"),
+		OriginalName:      c.PostForm("original_name"),
 		Path:              c.PostForm("path"),
 		ContentType:       c.PostForm("content_type"),
 		CreatedByEntityID: GetRequestTokenEntityID(c),
@@ -173,12 +178,8 @@ func UploadFile(c *gin.Context) {
 		UpdatedByEntityID: GetRequestTokenEntityID(c),
 		UpdatedByClientID: GetRequestTokenClientID(c),
 	}
-	if file.Name == "" {
-		file.Name = formFile.Filename
-	}
-	if file.Name == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
-		return
+	if file.OriginalName == "" {
+		file.OriginalName = formFile.Filename
 	}
 	if file.ContentType == "" {
 		file.ContentType = formFile.Header.Get("Content-Type")
@@ -209,7 +210,17 @@ func UploadFile(c *gin.Context) {
 	}
 	defer body.Close()
 
-	created, err := service.UploadFile(c.Request.Context(), bucket, file, body, c.PostForm("storage_backend"), splitBackendNames(c.PostForm("replicas")))
+	// Depot is the only party that sees these bytes, so when the client reports
+	// no content type, sniff it here rather than storing the object as an opaque
+	// blob. Peeking leaves the reader positioned at the start for the upload.
+	reader := bufio.NewReaderSize(body, sniffLen)
+	if file.ContentType == "" {
+		if head, err := reader.Peek(sniffLen); err == nil || err == io.EOF {
+			file.ContentType = http.DetectContentType(head)
+		}
+	}
+
+	created, err := service.UploadFile(c.Request.Context(), bucket, file, reader, c.PostForm("storage_backend"), splitBackendNames(c.PostForm("replicas")))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -280,7 +291,7 @@ func GetFileContent(c *gin.Context) {
 	}
 	service.RecordAccess(file, model.AccessActionDownload, requestActor(c))
 	c.DataFromReader(http.StatusOK, file.SizeBytes, contentType, body, map[string]string{
-		"Content-Disposition": fmt.Sprintf("inline; filename=%q", file.Name),
+		"Content-Disposition": fmt.Sprintf("inline; filename=%q", file.DownloadName()),
 	})
 }
 
@@ -321,7 +332,7 @@ func InitiateUpload(c *gin.Context) {
 	Require(c, RequestTokenCanUploadToBucket(c, bucket))
 
 	var req struct {
-		Name           string            `json:"name"`
+		OriginalName   string            `json:"original_name"`
 		Path           string            `json:"path"`
 		ContentType    string            `json:"content_type"`
 		Public         bool              `json:"public"`
@@ -333,17 +344,13 @@ func InitiateUpload(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if req.Name == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
-		return
-	}
 	if req.Public && !bucket.AllowPublicFiles {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "this bucket does not allow public files"})
 		return
 	}
 
 	file := model.File{
-		Name:              req.Name,
+		OriginalName:      req.OriginalName,
 		Path:              req.Path,
 		ContentType:       req.ContentType,
 		Public:            req.Public,

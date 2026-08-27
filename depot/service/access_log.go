@@ -19,7 +19,7 @@ func RecordAccess(file model.File, action model.AccessAction, actor Actor) {
 	log := model.AccessLog{
 		ID:         ulid.Make().Prefixed("acc"),
 		FileID:     file.ID,
-		FileName:   file.Name,
+		FileName:   file.OriginalName,
 		BucketID:   file.BucketID,
 		BucketName: file.BucketName,
 		Action:     action,

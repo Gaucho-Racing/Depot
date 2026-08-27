@@ -47,7 +47,7 @@ export type DepotFile = {
   id: string
   bucket_id: string
   bucket_name: string
-  name: string
+  original_name: string
   path: string
   content_type: string
   size_bytes: number
@@ -267,12 +267,18 @@ export async function searchFiles(q: string, limit = 50) {
 
 export async function uploadFile(
   bucket: string,
-  input: { file: File; name?: string; path?: string; public?: boolean; tags?: Record<string, string> },
+  input: {
+    file: File
+    original_name?: string
+    path?: string
+    public?: boolean
+    tags?: Record<string, string>
+  },
   onProgress?: (percent: number) => void,
 ) {
   const form = new FormData()
   form.append("file", input.file)
-  if (input.name) form.append("name", input.name)
+  if (input.original_name) form.append("original_name", input.original_name)
   if (input.path) form.append("path", input.path)
   if (input.public !== undefined) form.append("public", String(input.public))
   if (input.tags && Object.keys(input.tags).length > 0) form.append("tags", JSON.stringify(input.tags))

@@ -25,7 +25,10 @@ type Backend interface {
 	Get(ctx context.Context, key string) (io.ReadCloser, error)
 	Stat(ctx context.Context, key string) (ObjectInfo, error)
 	Delete(ctx context.Context, key string) error
-	PresignGet(ctx context.Context, key string, expiry time.Duration) (PresignedRequest, error)
+	// PresignGet signs a download URL. filename, when set, is echoed back by the
+	// provider as a Content-Disposition so the object does not save under its
+	// storage key.
+	PresignGet(ctx context.Context, key string, filename string, expiry time.Duration) (PresignedRequest, error)
 	PresignPut(ctx context.Context, key string, contentType string, expiry time.Duration) (PresignedRequest, error)
 }
 

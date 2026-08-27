@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"time"
 
@@ -125,11 +126,15 @@ func (b *S3Backend) Delete(ctx context.Context, key string) error {
 	return err
 }
 
-func (b *S3Backend) PresignGet(ctx context.Context, key string, expiry time.Duration) (PresignedRequest, error) {
-	request, err := b.presign.PresignGetObject(ctx, &s3.GetObjectInput{
+func (b *S3Backend) PresignGet(ctx context.Context, key string, filename string, expiry time.Duration) (PresignedRequest, error) {
+	input := &s3.GetObjectInput{
 		Bucket: aws.String(b.bucket),
 		Key:    aws.String(key),
-	}, func(o *s3.PresignOptions) {
+	}
+	if filename != "" {
+		input.ResponseContentDisposition = aws.String(fmt.Sprintf("attachment; filename=%q", filename))
+	}
+	request, err := b.presign.PresignGetObject(ctx, input, func(o *s3.PresignOptions) {
 		o.Expires = expiry
 	})
 	if err != nil {

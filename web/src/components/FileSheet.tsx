@@ -67,7 +67,7 @@ export function FileSheet({
         {file && (
           <>
             <SheetHeader>
-              <SheetTitle className="break-all font-mono text-base">{file.name}</SheetTitle>
+              <SheetTitle className="break-all font-mono text-base">{file.id}</SheetTitle>
               <SheetDescription className="flex items-center gap-2">
                 {file.public ? (
                   <Badge className="bg-gr-purple">
@@ -78,7 +78,7 @@ export function FileSheet({
                     <Lock className="size-3" /> Private
                   </Badge>
                 )}
-                <span className="font-mono text-xs">{file.id}</span>
+                <span className="truncate text-xs">{file.original_name || "unnamed"}</span>
               </SheetDescription>
             </SheetHeader>
 
@@ -93,6 +93,7 @@ export function FileSheet({
               <Separator />
 
               <div>
+                <Row label="Original name" value={file.original_name} />
                 <Row label="Path" value={file.path} mono />
                 <Row label="Content type" value={file.content_type} />
                 <Row label="Size" value={formatBytes(file.size_bytes)} />
