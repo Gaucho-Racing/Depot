@@ -1,7 +1,6 @@
 package sentinel
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gaucho-racing/depot/depot/config"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type Error struct {
@@ -64,43 +64,33 @@ type Group struct {
 
 var httpClient = &http.Client{Timeout: 5 * time.Second}
 
+// Token exchange happens once per sign-in and its failure lands the user on an
+// error screen, so it tolerates a slow Sentinel rather than failing fast.
+var authClient = &http.Client{Timeout: 20 * time.Second}
+
+// ValidateToken verifies a Sentinel JWT locally against the JWKS loaded at
+// boot: RS256 signature, the registered time claims, and a non-empty audience,
+// which mirrors what Sentinel's own validate endpoint enforces.
+//
+// The one check it cannot reproduce is revocation — Sentinel confirms the
+// token's jti still has an auth_token row, which is how rotating or deleting a
+// service account kills its outstanding tokens. Accepted deliberately: a
+// request per call to an external service on Depot's hottest path is a worse
+// trade, and a revoked token here stays usable until it expires.
 func ValidateToken(token string) (map[string]interface{}, error) {
-	if strings.TrimSpace(config.SentinelURL) == "" {
-		return nil, fmt.Errorf("SENTINEL_URL is not configured")
-	}
-
-	body, err := json.Marshal(map[string]string{"token": token})
+	claims := jwt.MapClaims{}
+	parsed, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (interface{}, error) {
+		kid, _ := t.Header["kid"].(string)
+		return lookupKey(kid)
+	}, jwt.WithValidMethods([]string{"RS256"}))
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(http.MethodPost, strings.TrimRight(config.SentinelURL, "/")+"/api/core/token/validate", bytes.NewReader(body))
-	if err != nil {
-		return nil, err
+	if !parsed.Valid {
+		return nil, fmt.Errorf("token is invalid")
 	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		var sentinelErr Error
-		if err := json.Unmarshal(respBody, &sentinelErr); err != nil {
-			return nil, err
-		}
-		sentinelErr.Code = resp.StatusCode
-		return nil, fmt.Errorf("sentinel error: [%d] %s", sentinelErr.Code, sentinelErr.Message)
-	}
-
-	var claims map[string]interface{}
-	if err := json.Unmarshal(respBody, &claims); err != nil {
-		return nil, err
+	if audience, ok := claims["aud"]; !ok || audience == nil {
+		return nil, fmt.Errorf("token has invalid audience")
 	}
 	return claims, nil
 }
@@ -267,7 +257,7 @@ func exchangeToken(form url.Values) (TokenResponse, error) {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := httpClient.Do(req)
+	resp, err := authClient.Do(req)
 	if err != nil {
 		return TokenResponse{}, err
 	}
