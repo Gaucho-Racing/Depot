@@ -305,13 +305,14 @@ function filenameFromDisposition(header: string | undefined) {
 /**
  * downloadFile streams a file through Depot rather than handing the browser a
  * presigned URL. Depot sees the transfer, so the access log records a real
- * download and a missing primary object falls back to a replica. The response
- * is buffered in memory, so this is the wrong choice for very large objects —
- * createDownloadURL is the direct-from-storage alternative.
+ * download and a missing primary object falls back to a replica. Addressed by
+ * file id alone. The response is buffered in memory, so this is the wrong
+ * choice for very large objects — createDownloadURL is the direct-from-storage
+ * alternative.
  */
-export async function downloadFile(bucket: string, id: string, onProgress?: (percent: number) => void) {
+export async function downloadFile(id: string, onProgress?: (percent: number) => void) {
   const response = await api.get<Blob>(
-    `/buckets/${encodeURIComponent(bucket)}/files/${encodeURIComponent(id)}/download`,
+    `/download/${encodeURIComponent(id)}`,
     {
       responseType: "blob",
       onDownloadProgress: (event) => {

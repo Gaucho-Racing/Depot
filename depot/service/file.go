@@ -21,7 +21,19 @@ func expiryDuration() time.Duration {
 	return 15 * time.Minute
 }
 
-func GetFileByID(bucketID string, fileID string) (model.File, error) {
+// GetFileByID resolves a file from its id alone. Ids are ULIDs, so the id
+// already determines the bucket — callers do not have to know it.
+func GetFileByID(fileID string) (model.File, error) {
+	var file model.File
+	if err := database.DB.Where("id = ?", fileID).First(&file).Error; err != nil {
+		return model.File{}, err
+	}
+	return AttachReplicas(file), nil
+}
+
+// GetBucketFileByID resolves a file within a known bucket, for the routes that
+// address files under their bucket.
+func GetBucketFileByID(bucketID string, fileID string) (model.File, error) {
 	var file model.File
 	if err := database.DB.Where("bucket_id = ? AND id = ?", bucketID, fileID).First(&file).Error; err != nil {
 		return model.File{}, err

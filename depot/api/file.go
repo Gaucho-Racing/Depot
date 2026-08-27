@@ -31,7 +31,7 @@ func findBucket(c *gin.Context) (model.Bucket, bool) {
 }
 
 func findFile(c *gin.Context, bucket model.Bucket) (model.File, bool) {
-	file, err := service.GetFileByID(bucket.ID, c.Param("id"))
+	file, err := service.GetBucketFileByID(bucket.ID, c.Param("id"))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
@@ -53,6 +53,26 @@ func publiclyReadable(bucket model.Bucket, file model.File) bool {
 
 // sniffLen is what http.DetectContentType inspects.
 const sniffLen = 512
+
+// findFileByID resolves a file addressed by id alone, along with the bucket
+// that owns it, since authorization is a property of the bucket.
+func findFileByID(c *gin.Context) (model.File, model.Bucket, bool) {
+	file, err := service.GetFileByID(c.Param("fileID"))
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
+			return model.File{}, model.Bucket{}, false
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return model.File{}, model.Bucket{}, false
+	}
+	bucket, err := service.GetBucketByID(file.BucketID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return model.File{}, model.Bucket{}, false
+	}
+	return file, bucket, true
+}
 
 func splitBackendNames(value string) []string {
 	names := []string{}
@@ -263,11 +283,7 @@ func GetFileAccessLogs(c *gin.Context) {
 }
 
 func DownloadFile(c *gin.Context) {
-	bucket, ok := findBucket(c)
-	if !ok {
-		return
-	}
-	file, ok := findFile(c, bucket)
+	file, bucket, ok := findFileByID(c)
 	if !ok {
 		return
 	}

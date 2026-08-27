@@ -58,7 +58,7 @@ export function FileSheet({
   async function handleDownload() {
     setDownloadProgress(0)
     try {
-      await downloadFile(file!.bucket_name, file!.id, setDownloadProgress)
+      await downloadFile(file!.id, setDownloadProgress)
     } catch (error) {
       toast.error(errorMessage(error, "Download failed"))
     } finally {
