@@ -262,7 +262,7 @@ func GetFileAccessLogs(c *gin.Context) {
 	c.JSON(http.StatusOK, logs)
 }
 
-func GetFileContent(c *gin.Context) {
+func DownloadFile(c *gin.Context) {
 	bucket, ok := findBucket(c)
 	if !ok {
 		return

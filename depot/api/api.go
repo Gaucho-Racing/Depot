@@ -79,7 +79,7 @@ func InitializeRoutes(router *gin.Engine) {
 	router.GET("/buckets/:bucketName/files", ListFiles)
 	router.POST("/buckets/:bucketName/files", UploadFile)
 	router.GET("/buckets/:bucketName/files/:id", GetFile)
-	router.GET("/buckets/:bucketName/files/:id/content", GetFileContent)
+	router.GET("/buckets/:bucketName/files/:id/download", DownloadFile)
 	router.GET("/buckets/:bucketName/files/:id/access-logs", GetFileAccessLogs)
 	router.POST("/buckets/:bucketName/files/:id/download-url", CreateDownloadURL)
 

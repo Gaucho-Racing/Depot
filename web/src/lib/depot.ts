@@ -311,7 +311,7 @@ function filenameFromDisposition(header: string | undefined) {
  */
 export async function downloadFile(bucket: string, id: string, onProgress?: (percent: number) => void) {
   const response = await api.get<Blob>(
-    `/buckets/${encodeURIComponent(bucket)}/files/${encodeURIComponent(id)}/content`,
+    `/buckets/${encodeURIComponent(bucket)}/files/${encodeURIComponent(id)}/download`,
     {
       responseType: "blob",
       onDownloadProgress: (event) => {
