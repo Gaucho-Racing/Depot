@@ -197,6 +197,18 @@ export async function deleteStorageBackend(name: string) {
   await api.delete(`/storage-backends/${encodeURIComponent(name)}`)
 }
 
+/**
+ * pingStorageBackend round-trips a probe object through the backend to prove
+ * the credentials actually carry read, write and delete permission. A failed
+ * probe resolves rather than throws — it reports a result, not a request error.
+ */
+export async function pingStorageBackend(name: string) {
+  const response = await api.post<{ ok: boolean; error?: string }>(
+    `/storage-backends/${encodeURIComponent(name)}/ping`,
+  )
+  return response.data
+}
+
 export async function listBuckets() {
   const response = await api.get<Bucket[]>("/buckets")
   return response.data

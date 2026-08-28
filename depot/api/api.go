@@ -67,6 +67,7 @@ func InitializeRoutes(router *gin.Engine) {
 	router.POST("/storage-backends", CreateStorageBackend)
 	router.PATCH("/storage-backends/:backendName", UpdateStorageBackend)
 	router.DELETE("/storage-backends/:backendName", DeleteStorageBackend)
+	router.POST("/storage-backends/:backendName/ping", PingStorageBackend)
 
 	router.GET("/buckets", ListBuckets)
 	router.POST("/buckets", CreateBucket)
