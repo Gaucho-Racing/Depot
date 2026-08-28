@@ -21,7 +21,19 @@ func expiryDuration() time.Duration {
 	return 15 * time.Minute
 }
 
-func GetFileByID(bucketID string, fileID string) (model.File, error) {
+// GetFileByID resolves a file from its id alone. Ids are ULIDs, so the id
+// already determines the bucket — callers do not have to know it.
+func GetFileByID(fileID string) (model.File, error) {
+	var file model.File
+	if err := database.DB.Where("id = ?", fileID).First(&file).Error; err != nil {
+		return model.File{}, err
+	}
+	return AttachReplicas(file), nil
+}
+
+// GetBucketFileByID resolves a file within a known bucket, for the routes that
+// address files under their bucket.
+func GetBucketFileByID(bucketID string, fileID string) (model.File, error) {
 	var file model.File
 	if err := database.DB.Where("bucket_id = ? AND id = ?", bucketID, fileID).First(&file).Error; err != nil {
 		return model.File{}, err
@@ -46,7 +58,7 @@ func ListFiles(q FileQuery) ([]model.File, error) {
 	}
 	if q.Search != "" {
 		pattern := "%" + q.Search + "%"
-		query = query.Where("name ILIKE ? OR path ILIKE ?", pattern, pattern)
+		query = query.Where("original_name ILIKE ? OR path ILIKE ?", pattern, pattern)
 	}
 	if q.Status != "" {
 		query = query.Where("status = ?", q.Status)
@@ -369,7 +381,7 @@ func OpenFile(ctx context.Context, file model.File) (io.ReadCloser, error) {
 func PresignDownload(ctx context.Context, file model.File) (storage.PresignedRequest, error) {
 	backend, err := storage.GetBackend(file.StorageBackend)
 	if err == nil {
-		return backend.PresignGet(ctx, file.StorageKey, expiryDuration())
+		return backend.PresignGet(ctx, file.StorageKey, file.DownloadName(), expiryDuration())
 	}
 
 	for _, replica := range activeReplicas(file) {
@@ -378,7 +390,7 @@ func PresignDownload(ctx context.Context, file model.File) (storage.PresignedReq
 			continue
 		}
 		logger.SugarLogger.Warnf("Presigning file %s from replica backend %s (primary %s unavailable)", file.ID, replica.StorageBackend, file.StorageBackend)
-		return target.PresignGet(ctx, replica.StorageKey, expiryDuration())
+		return target.PresignGet(ctx, replica.StorageKey, file.DownloadName(), expiryDuration())
 	}
 	return storage.PresignedRequest{}, err
 }

@@ -177,6 +177,24 @@ func UpdateStorageBackend(c *gin.Context) {
 	c.JSON(http.StatusOK, updated)
 }
 
+// PingStorageBackend reports whether Depot can round-trip an object through a
+// backend. A failed probe is still a successful request — the check ran and
+// produced an answer — so the result is carried in the body rather than the
+// status, letting the caller render it instead of handling an error.
+func PingStorageBackend(c *gin.Context) {
+	Require(c, RequestTokenIsAdmin(c))
+
+	backend, ok := findStorageBackend(c)
+	if !ok {
+		return
+	}
+	if err := service.PingStorageBackend(c.Request.Context(), backend); err != nil {
+		c.JSON(http.StatusOK, gin.H{"ok": false, "error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
 func DeleteStorageBackend(c *gin.Context) {
 	Require(c, RequestTokenIsAdmin(c))
 

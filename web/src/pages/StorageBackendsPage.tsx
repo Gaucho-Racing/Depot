@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Database, Pencil, Plus, Star, Trash2 } from "lucide-react"
+import { Database, Loader2, Pencil, Plug, Plus, Star, Trash2 } from "lucide-react"
 import { useMemo, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 
@@ -34,6 +34,7 @@ import {
   errorMessage,
   listStorageBackends,
   listStorageProviders,
+  pingStorageBackend,
   updateStorageBackend,
   type ProviderRegions,
   type StorageBackend,
@@ -369,6 +370,20 @@ export default function StorageBackendsPage() {
     },
   })
 
+  const pingMutation = useMutation({
+    mutationFn: (name: string) => pingStorageBackend(name),
+    onSuccess: (result, name) => {
+      if (result.ok) {
+        toast.success(`${name} passed: wrote, read back and deleted a test object`)
+        return
+      }
+      toast.error(result.error ?? `${name} failed the connection test`, { duration: 12000 })
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, "Failed to run the connection test"))
+    },
+  })
+
   const deleteMutation = useMutation({
     mutationFn: (name: string) => deleteStorageBackend(name),
     onSuccess: () => {
@@ -452,6 +467,19 @@ export default function StorageBackendsPage() {
                   </div>
                   {isAdmin && (
                     <div className="flex shrink-0 gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        disabled={pingMutation.isPending}
+                        onClick={() => pingMutation.mutate(backend.name)}
+                      >
+                        {pingMutation.isPending && pingMutation.variables === backend.name ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Plug className="size-4" />
+                        )}
+                        <span className="sr-only">Test {backend.name}</span>
+                      </Button>
                       <BackendFormDialog
                         trigger={
                           <Button variant="outline" size="icon">

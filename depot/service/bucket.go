@@ -26,6 +26,14 @@ func GetAllBuckets() ([]model.Bucket, error) {
 	return buckets, nil
 }
 
+func GetBucketByID(id string) (model.Bucket, error) {
+	var bucket model.Bucket
+	if err := database.DB.Where("id = ?", id).First(&bucket).Error; err != nil {
+		return model.Bucket{}, err
+	}
+	return bucket, nil
+}
+
 func GetBucketByName(name string) (model.Bucket, error) {
 	var bucket model.Bucket
 	if err := database.DB.Where("name = ?", name).First(&bucket).Error; err != nil {

@@ -1,8 +1,11 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"time"
 
 	"github.com/gaucho-racing/depot/depot/database"
 	"github.com/gaucho-racing/depot/depot/model"
@@ -122,6 +125,89 @@ func BuildBackendClient(ctx context.Context, backend model.StorageBackend) (stor
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", backend.Provider)
 	}
+}
+
+// Probe keys live outside the bucket-name namespace real files are keyed under
+// (see UploadFile), so a probe can never collide with a stored object.
+const probeKeyPrefix = ".depot-healthcheck/"
+
+// probePayload is read back and compared byte for byte, so a backend that
+// accepts the write but serves something else — credentials pointed at a
+// different bucket than configured, say — fails rather than passes.
+var probePayload = []byte("depot storage backend healthcheck")
+
+// probeTimeout bounds the whole round trip. An unreachable custom endpoint
+// otherwise hangs until the client's own dial timeout, and this runs inside a
+// request.
+const probeTimeout = 15 * time.Second
+
+// PingStorageBackend verifies that Depot can actually use a backend rather than
+// merely construct a client for it. BuildBackendClient proves nothing about
+// credentials or bucket access — the AWS SDK builds clients lazily — so this
+// round-trips a small object through the four operations every upload and
+// download depends on: Put, Stat, Get and Delete. A backend missing
+// PutObject or DeleteObject fails here instead of on someone's first upload.
+//
+// Works on a disabled backend too, since it builds its own client rather than
+// going through the registry, which only holds enabled ones.
+func PingStorageBackend(ctx context.Context, backend model.StorageBackend) error {
+	client, err := BuildBackendClient(ctx, backend)
+	if err != nil {
+		return fmt.Errorf("failed to build client: %w", err)
+	}
+
+	probeCtx, cancel := context.WithTimeout(ctx, probeTimeout)
+	defer cancel()
+
+	key := probeKeyPrefix + ulid.Make().String()
+	if err := client.Put(probeCtx, key, bytes.NewReader(probePayload), "application/octet-stream"); err != nil {
+		return fmt.Errorf("failed to write to bucket %s: %w", backend.Bucket, err)
+	}
+	readErr := readBackProbe(probeCtx, client, key)
+
+	// The object exists from here on, so it gets deleted whatever the read did.
+	// Cleanup deliberately inherits neither the probe deadline nor the caller's
+	// cancellation: a timeout partway through the read would otherwise cancel
+	// the delete along with it and leave the probe object behind.
+	cleanupCtx, cancelCleanup := context.WithTimeout(context.WithoutCancel(ctx), probeTimeout)
+	defer cancelCleanup()
+	deleteErr := client.Delete(cleanupCtx, key)
+
+	switch {
+	case readErr != nil && deleteErr != nil:
+		return fmt.Errorf("%w (also failed to clean up probe object %s: %v)", readErr, key, deleteErr)
+	case readErr != nil:
+		return readErr
+	case deleteErr != nil:
+		return fmt.Errorf("wrote and read back successfully, but failed to delete probe object %s: %w", key, deleteErr)
+	}
+	return nil
+}
+
+func readBackProbe(ctx context.Context, client storage.Backend, key string) error {
+	info, err := client.Stat(ctx, key)
+	if err != nil {
+		return fmt.Errorf("failed to stat the object just written: %w", err)
+	}
+	if info.SizeBytes != int64(len(probePayload)) {
+		return fmt.Errorf("wrote %d bytes but the backend reports %d", len(probePayload), info.SizeBytes)
+	}
+
+	body, err := client.Get(ctx, key)
+	if err != nil {
+		return fmt.Errorf("failed to read back the object just written: %w", err)
+	}
+	defer body.Close()
+
+	// One byte past the payload distinguishes a correct read from a longer one.
+	got, err := io.ReadAll(io.LimitReader(body, int64(len(probePayload))+1))
+	if err != nil {
+		return fmt.Errorf("failed to read back the object just written: %w", err)
+	}
+	if !bytes.Equal(got, probePayload) {
+		return fmt.Errorf("the object read back does not match what was written")
+	}
+	return nil
 }
 
 func RebuildStorageBackends() error {

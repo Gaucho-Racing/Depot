@@ -71,9 +71,11 @@ export default function SearchPage() {
                     className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 px-4 py-3 text-left transition-colors hover:bg-muted/40 sm:grid-cols-[minmax(0,1fr)_130px_90px_auto]"
                   >
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium">{file.name}</span>
-                      <span className="block truncate font-mono text-xs text-muted-foreground">
-                        {file.path || file.id}
+                      <span className="block truncate font-mono text-sm font-medium">
+                        {file.id}
+                      </span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {[file.original_name, file.path].filter(Boolean).join(" · ") || "—"}
                       </span>
                     </span>
                     <span className="hidden sm:block">

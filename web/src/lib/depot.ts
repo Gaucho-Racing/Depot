@@ -47,7 +47,7 @@ export type DepotFile = {
   id: string
   bucket_id: string
   bucket_name: string
-  name: string
+  original_name: string
   path: string
   content_type: string
   size_bytes: number
@@ -197,6 +197,18 @@ export async function deleteStorageBackend(name: string) {
   await api.delete(`/storage-backends/${encodeURIComponent(name)}`)
 }
 
+/**
+ * pingStorageBackend round-trips a probe object through the backend to prove
+ * the credentials actually carry read, write and delete permission. A failed
+ * probe resolves rather than throws — it reports a result, not a request error.
+ */
+export async function pingStorageBackend(name: string) {
+  const response = await api.post<{ ok: boolean; error?: string }>(
+    `/storage-backends/${encodeURIComponent(name)}/ping`,
+  )
+  return response.data
+}
+
 export async function listBuckets() {
   const response = await api.get<Bucket[]>("/buckets")
   return response.data
@@ -267,12 +279,18 @@ export async function searchFiles(q: string, limit = 50) {
 
 export async function uploadFile(
   bucket: string,
-  input: { file: File; name?: string; path?: string; public?: boolean; tags?: Record<string, string> },
+  input: {
+    file: File
+    original_name?: string
+    path?: string
+    public?: boolean
+    tags?: Record<string, string>
+  },
   onProgress?: (percent: number) => void,
 ) {
   const form = new FormData()
   form.append("file", input.file)
-  if (input.name) form.append("name", input.name)
+  if (input.original_name) form.append("original_name", input.original_name)
   if (input.path) form.append("path", input.path)
   if (input.public !== undefined) form.append("public", String(input.public))
   if (input.tags && Object.keys(input.tags).length > 0) form.append("tags", JSON.stringify(input.tags))
@@ -284,6 +302,51 @@ export async function uploadFile(
     },
   })
   return response.data
+}
+
+// filenameFromDisposition pulls the name Depot chose out of the response
+// header, preferring the RFC 5987 form when present.
+function filenameFromDisposition(header: string | undefined) {
+  if (!header) return undefined
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header)
+  if (encoded) return decodeURIComponent(encoded[1])
+  const plain = /filename="?([^";]+)"?/i.exec(header)
+  return plain?.[1]
+}
+
+/**
+ * downloadFile streams a file through Depot rather than handing the browser a
+ * presigned URL. Depot sees the transfer, so the access log records a real
+ * download and a missing primary object falls back to a replica. Addressed by
+ * file id alone. The response is buffered in memory, so this is the wrong
+ * choice for very large objects — createDownloadURL is the direct-from-storage
+ * alternative.
+ */
+export async function downloadFile(id: string, onProgress?: (percent: number) => void) {
+  const response = await api.get<Blob>(
+    `/download/${encodeURIComponent(id)}`,
+    {
+      responseType: "blob",
+      onDownloadProgress: (event) => {
+        if (onProgress && event.total) {
+          onProgress(Math.round((event.loaded / event.total) * 100))
+        }
+      },
+    },
+  )
+
+  const filename =
+    filenameFromDisposition(response.headers["content-disposition"] as string | undefined) ?? id
+  const objectUrl = URL.createObjectURL(response.data)
+  const anchor = document.createElement("a")
+  anchor.href = objectUrl
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  // Revoking synchronously can cancel the save in some browsers.
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000)
+  return filename
 }
 
 export async function createDownloadURL(bucket: string, id: string) {

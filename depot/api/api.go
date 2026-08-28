@@ -57,11 +57,17 @@ func InitializeRoutes(router *gin.Engine) {
 	router.GET("/stats/activity", GetActivityStats)
 	router.GET("/files/search", SearchFiles)
 
+	// Files are addressed by id alone here: the id determines the bucket, so a
+	// consumer stores one reference, and a public file gets a URL it can be
+	// embedded with.
+	router.GET("/download/:fileID", DownloadFile)
+
 	router.GET("/storage-backends", ListStorageBackends)
 	router.GET("/storage-backends/providers", ListStorageProviders)
 	router.POST("/storage-backends", CreateStorageBackend)
 	router.PATCH("/storage-backends/:backendName", UpdateStorageBackend)
 	router.DELETE("/storage-backends/:backendName", DeleteStorageBackend)
+	router.POST("/storage-backends/:backendName/ping", PingStorageBackend)
 
 	router.GET("/buckets", ListBuckets)
 	router.POST("/buckets", CreateBucket)
@@ -79,7 +85,6 @@ func InitializeRoutes(router *gin.Engine) {
 	router.GET("/buckets/:bucketName/files", ListFiles)
 	router.POST("/buckets/:bucketName/files", UploadFile)
 	router.GET("/buckets/:bucketName/files/:id", GetFile)
-	router.GET("/buckets/:bucketName/files/:id/content", GetFileContent)
 	router.GET("/buckets/:bucketName/files/:id/access-logs", GetFileAccessLogs)
 	router.POST("/buckets/:bucketName/files/:id/download-url", CreateDownloadURL)
 
