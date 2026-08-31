@@ -338,7 +338,7 @@ export default function ApiDocumentationPage() {
             <div className="space-y-5">
               {filteredGroups.map((group) => (
                 <Card key={group.name} className="gap-0 py-0">
-                  <CardHeader className="border-b py-4">
+                  <CardHeader className="border-b border-border/40 py-4">
                     <CardTitle>{group.name}</CardTitle>
                     <CardDescription>{group.description}</CardDescription>
                   </CardHeader>
