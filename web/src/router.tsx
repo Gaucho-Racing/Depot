@@ -2,7 +2,6 @@ import { createBrowserRouter, Navigate } from "react-router-dom"
 
 import { AppShell } from "@/components/AppShell"
 import { RequireAuth } from "@/components/RequireAuth"
-import ApiDocumentationPage from "@/pages/ApiDocumentationPage"
 import BucketDetailsPage from "@/pages/BucketDetailsPage"
 import BucketsPage from "@/pages/BucketsPage"
 import EditBucketPage from "@/pages/EditBucketPage"
@@ -29,7 +28,13 @@ export const router = createBrowserRouter([
           { path: "/buckets/:bucketName/edit", element: <EditBucketPage /> },
           { path: "/search", element: <SearchPage /> },
           { path: "/storage-backends", element: <StorageBackendsPage /> },
-          { path: "/api-docs", element: <ApiDocumentationPage /> },
+          {
+            path: "/api-docs",
+            lazy: async () => {
+              const { default: Component } = await import("@/pages/ApiDocumentationPage")
+              return { Component }
+            },
+          },
           { path: "/settings", element: <SettingsPage /> },
         ],
       },

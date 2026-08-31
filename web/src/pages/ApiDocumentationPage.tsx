@@ -10,6 +10,12 @@ import {
   ShieldCheck,
   Terminal,
 } from "lucide-react"
+import Prism from "prismjs"
+import "prismjs/components/prism-bash"
+import "prismjs/components/prism-go"
+import "prismjs/components/prism-python"
+import "prismjs/components/prism-typescript"
+import { Highlight, themes } from "prism-react-renderer"
 import { toast } from "sonner"
 
 import { PageContainer } from "@/components/PageContainer"
@@ -53,7 +59,6 @@ const endpointGroups: EndpointGroup[] = [
       { method: "GET", path: "/buckets/:bucketName/files", summary: "List and filter files in a bucket.", access: "READ grant" },
       { method: "POST", path: "/buckets/:bucketName/files", summary: "Upload a file as multipart form data.", access: "WRITE grant" },
       { method: "GET", path: "/buckets/:bucketName/files/:id", summary: "Get metadata for one file.", access: "Public or READ" },
-      { method: "GET", path: "/buckets/:bucketName/files/:id/access-logs", summary: "Get the latest access events for a file.", access: "Admin" },
       { method: "POST", path: "/buckets/:bucketName/files/:id/download-url", summary: "Create a temporary direct-download URL.", access: "Public or READ" },
       { method: "POST", path: "/buckets/:bucketName/uploads", summary: "Start a direct-to-storage upload.", access: "WRITE grant" },
       { method: "POST", path: "/buckets/:bucketName/uploads/:id/complete", summary: "Verify and activate a direct upload.", access: "WRITE grant" },
@@ -61,45 +66,10 @@ const endpointGroups: EndpointGroup[] = [
   },
   {
     name: "Buckets",
-    description: "Discover buckets and manage their access policies.",
+    description: "Discover the buckets available to your application.",
     endpoints: [
       { method: "GET", path: "/buckets", summary: "List buckets visible to the caller.", access: "Bearer token" },
-      { method: "POST", path: "/buckets", summary: "Create a bucket.", access: "Admin" },
       { method: "GET", path: "/buckets/:bucketName", summary: "Get bucket details.", access: "READ grant" },
-      { method: "PUT", path: "/buckets/:bucketName", summary: "Replace editable bucket settings.", access: "Admin" },
-      { method: "DELETE", path: "/buckets/:bucketName", summary: "Delete an empty bucket.", access: "Admin" },
-      { method: "GET", path: "/buckets/:bucketName/grants", summary: "List application grants for a bucket.", access: "Bearer token" },
-      { method: "POST", path: "/buckets/:bucketName/grants", summary: "Grant an application READ or WRITE access.", access: "Admin" },
-      { method: "PATCH", path: "/buckets/:bucketName/grants/:clientID", summary: "Change an application's bucket grant.", access: "Admin" },
-      { method: "DELETE", path: "/buckets/:bucketName/grants/:clientID", summary: "Revoke an application's bucket grant.", access: "Admin" },
-    ],
-  },
-  {
-    name: "Authentication",
-    description: "Browser sessions and Sentinel-backed identity information.",
-    endpoints: [
-      { method: "POST", path: "/auth/login?code=:code", summary: "Exchange a Sentinel authorization code.", access: "Public" },
-      { method: "GET", path: "/auth/session", summary: "Inspect the current Depot session.", access: "Bearer token" },
-      { method: "POST", path: "/auth/refresh", summary: "Exchange a refresh token for a new session.", access: "Public" },
-      { method: "POST", path: "/auth/logout", summary: "End the client-side Depot session.", access: "Public" },
-      { method: "GET", path: "/users/@me", summary: "Get the current Sentinel user.", access: "Bearer token" },
-      { method: "GET", path: "/groups", summary: "List Sentinel groups visible to the caller.", access: "Bearer token" },
-      { method: "GET", path: "/applications", summary: "List Sentinel applications.", access: "Admin" },
-    ],
-  },
-  {
-    name: "Operations",
-    description: "Usage metrics, health checks, and storage administration.",
-    endpoints: [
-      { method: "GET", path: "/ping", summary: "Check API availability and environment.", access: "Public" },
-      { method: "GET", path: "/stats", summary: "Get aggregate metrics for readable buckets.", access: "Bearer token" },
-      { method: "GET", path: "/stats/activity?days=:days", summary: "Get 1–365 days of file activity.", access: "Bearer token" },
-      { method: "GET", path: "/storage-backends", summary: "List configured storage backends.", access: "Bearer token" },
-      { method: "GET", path: "/storage-backends/providers", summary: "List supported providers and regions.", access: "Bearer token" },
-      { method: "POST", path: "/storage-backends", summary: "Create a storage backend.", access: "Admin" },
-      { method: "PATCH", path: "/storage-backends/:backendName", summary: "Update a storage backend.", access: "Admin" },
-      { method: "DELETE", path: "/storage-backends/:backendName", summary: "Delete an unused storage backend.", access: "Admin" },
-      { method: "POST", path: "/storage-backends/:backendName/ping", summary: "Verify backend read, write, and delete access.", access: "Admin" },
     ],
   },
 ]
@@ -122,13 +92,140 @@ if (!response.ok) {
 
 const files = await response.json()`
 
-const uploadCode = `curl --fail-with-body \\
+const uploadExamples = [
+  {
+    label: "cURL",
+    language: "bash",
+    code: `curl --fail-with-body \\
   --request POST \\
   --header "Authorization: Bearer $DEPOT_ACCESS_TOKEN" \\
   --form "file=@./telemetry.json" \\
   --form "path=telemetry/2026" \\
   --form 'tags={"car":"GR26","session":"autocross"}' \\
-  "$DEPOT_BASE_URL/buckets/telemetry/files"`
+  "$DEPOT_BASE_URL/buckets/telemetry/files"`,
+  },
+  {
+    label: "TypeScript",
+    language: "typescript",
+    code: `import { openAsBlob } from "node:fs"
+
+const depotBaseUrl = process.env.DEPOT_BASE_URL
+const depotToken = process.env.DEPOT_ACCESS_TOKEN
+if (!depotBaseUrl || !depotToken) {
+  throw new Error("Depot configuration is missing")
+}
+
+const file = await openAsBlob("./telemetry.json", {
+  type: "application/json",
+})
+const form = new FormData()
+form.set("file", file, "telemetry.json")
+form.set("path", "telemetry/2026")
+form.set("tags", JSON.stringify({ car: "GR26", session: "autocross" }))
+
+const response = await fetch(
+  \`${"${depotBaseUrl}"}/buckets/telemetry/files\`,
+  {
+    method: "POST",
+    headers: {
+      Authorization: \`Bearer ${"${depotToken}"}\`,
+    },
+    body: form,
+  },
+)
+
+if (!response.ok) {
+  throw new Error(\`Depot upload failed: ${"${response.status}"}\`)
+}
+
+const depotFile = await response.json()`,
+  },
+  {
+    label: "Python",
+    language: "python",
+    code: `import json
+import os
+
+import requests
+
+depot_base_url = os.environ["DEPOT_BASE_URL"]
+depot_token = os.environ["DEPOT_ACCESS_TOKEN"]
+
+with open("./telemetry.json", "rb") as file:
+    response = requests.post(
+        f"{depot_base_url}/buckets/telemetry/files",
+        headers={"Authorization": f"Bearer {depot_token}"},
+        files={"file": ("telemetry.json", file, "application/json")},
+        data={
+            "path": "telemetry/2026",
+            "tags": json.dumps({"car": "GR26", "session": "autocross"}),
+        },
+        timeout=60,
+    )
+
+response.raise_for_status()
+depot_file = response.json()`,
+  },
+  {
+    label: "Go",
+    language: "go",
+    code: `func uploadTelemetry(ctx context.Context) error {
+    source, err := os.Open("./telemetry.json")
+    if err != nil {
+        return fmt.Errorf("open telemetry file: %w", err)
+    }
+    defer source.Close()
+
+    var body bytes.Buffer
+    form := multipart.NewWriter(&body)
+    file, err := form.CreateFormFile("file", "telemetry.json")
+    if err != nil {
+        return fmt.Errorf("create file field: %w", err)
+    }
+    if _, err := io.Copy(file, source); err != nil {
+        return fmt.Errorf("write file field: %w", err)
+    }
+    if err := form.WriteField("path", "telemetry/2026"); err != nil {
+        return fmt.Errorf("write path field: %w", err)
+    }
+    if err := form.WriteField("tags", ` + "`" + `{"car":"GR26","session":"autocross"}` + "`" + `); err != nil {
+        return fmt.Errorf("write tags field: %w", err)
+    }
+    if err := form.Close(); err != nil {
+        return fmt.Errorf("close multipart form: %w", err)
+    }
+
+    baseURL := os.Getenv("DEPOT_BASE_URL")
+    token := os.Getenv("DEPOT_ACCESS_TOKEN")
+    if baseURL == "" || token == "" {
+        return errors.New("Depot configuration is missing")
+    }
+
+    endpoint := baseURL + "/buckets/telemetry/files"
+    request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, &body)
+    if err != nil {
+        return fmt.Errorf("create Depot request: %w", err)
+    }
+    request.Header.Set("Authorization", "Bearer "+token)
+    request.Header.Set("Content-Type", form.FormDataContentType())
+
+    response, err := http.DefaultClient.Do(request)
+    if err != nil {
+        return fmt.Errorf("upload to Depot: %w", err)
+    }
+    defer response.Body.Close()
+
+    if response.StatusCode != http.StatusCreated {
+        message, err := io.ReadAll(io.LimitReader(response.Body, 4096))
+        if err != nil {
+            return fmt.Errorf("read Depot error response: %w", err)
+        }
+        return fmt.Errorf("Depot upload failed (%s): %s", response.Status, message)
+    }
+    return nil
+}`,
+  },
+] as const
 
 const presignedCode = `# 1. Ask Depot for a temporary storage URL
 UPLOAD=$(curl --fail-with-body --request POST \\
@@ -168,10 +265,67 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
         <span className="font-mono text-[11px] uppercase tracking-wider text-zinc-400">{language}</span>
         <CopyButton value={code} label="Copy" />
       </div>
-      <pre className="overflow-x-auto p-4 text-xs leading-6 sm:text-[13px]">
-        <code>{code}</code>
-      </pre>
+      <Highlight prism={Prism} theme={themes.nightOwl} code={code.trim()} language={language}>
+        {({ className, style, tokens, getLineProps, getTokenProps }) => (
+          <pre
+            className={cn(className, "overflow-x-auto p-4 text-xs leading-6 sm:text-[13px]")}
+            style={{ ...style, margin: 0, background: "transparent" }}
+          >
+            <code>
+              {tokens.map((line, lineIndex) => {
+                const lineProps = getLineProps({ line })
+                return (
+                  <span key={lineIndex} {...lineProps} className={cn(lineProps.className, "block")}>
+                    {line.map((token, tokenIndex) => (
+                      <span key={tokenIndex} {...getTokenProps({ token })} />
+                    ))}
+                  </span>
+                )
+              })}
+            </code>
+          </pre>
+        )}
+      </Highlight>
     </div>
+  )
+}
+
+function UploadExamples() {
+  const [selectedLabel, setSelectedLabel] = useState<string>(uploadExamples[0].label)
+  const selectedExample =
+    uploadExamples.find((example) => example.label === selectedLabel) ?? uploadExamples[0]
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Terminal className="size-4 text-primary" />Upload a file
+        </CardTitle>
+        <CardDescription>
+          Multipart upload examples for files within Depot's configured proxy limit.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap gap-1" role="tablist" aria-label="Upload example language">
+          {uploadExamples.map((example) => (
+            <Button
+              key={example.label}
+              type="button"
+              role="tab"
+              size="sm"
+              variant={example.label === selectedExample.label ? "secondary" : "ghost"}
+              aria-selected={example.label === selectedExample.label}
+              onClick={() => setSelectedLabel(example.label)}
+            >
+              {example.label}
+            </Button>
+          ))}
+        </div>
+        <div role="tabpanel">
+          <CodeBlock code={selectedExample.code} language={selectedExample.language} />
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -197,7 +351,7 @@ function EndpointRow({ endpoint }: { endpoint: Endpoint }) {
         {endpoint.method}
       </Badge>
       <code className="min-w-0 overflow-x-auto whitespace-nowrap font-mono text-xs font-medium sm:text-sm">
-        /api{endpoint.path}
+        {endpoint.path}
       </code>
       <p className="text-sm text-muted-foreground">{endpoint.summary}</p>
       <div className="flex md:justify-end">
@@ -283,7 +437,7 @@ export default function ApiDocumentationPage() {
               <h2 className="text-xl font-semibold">Quick start</h2>
               <p className="mt-1 text-sm text-muted-foreground">Use environment variables so credentials never enter source control.</p>
             </div>
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2"><Code2 className="size-4 text-primary" />List files</CardTitle>
@@ -291,13 +445,7 @@ export default function ApiDocumentationPage() {
                 </CardHeader>
                 <CardContent><CodeBlock code={quickStartCode} language="typescript" /></CardContent>
               </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><Terminal className="size-4 text-primary" />Upload a file</CardTitle>
-                  <CardDescription>Multipart upload for files within the configured proxy limit.</CardDescription>
-                </CardHeader>
-                <CardContent><CodeBlock code={uploadCode} language="shell" /></CardContent>
-              </Card>
+              <UploadExamples />
             </div>
           </section>
 
@@ -318,7 +466,7 @@ export default function ApiDocumentationPage() {
                     Do not send your Depot bearer token to the presigned storage URL.
                   </div>
                 </div>
-                <CodeBlock code={presignedCode} language="shell" />
+                <CodeBlock code={presignedCode} language="bash" />
               </CardContent>
             </Card>
           </section>
