@@ -1,6 +1,7 @@
-import { AppWindow, Check, Search, X } from "lucide-react"
+import { Check, Search, X } from "lucide-react"
 import { useMemo, useState } from "react"
 
+import { ApplicationIcon } from "@/components/ApplicationDisplay"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,17 +26,6 @@ function matches(app: SentinelApplication, query: string) {
   const q = query.trim().toLowerCase()
   if (!q) return true
   return app.name.toLowerCase().includes(q) || app.client_id.toLowerCase().includes(q)
-}
-
-function AppIcon({ app }: { app?: SentinelApplication }) {
-  if (app?.icon_url) {
-    return <img src={app.icon_url} alt="" className="size-7 shrink-0 rounded-md object-cover" />
-  }
-  return (
-    <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-gr-purple to-gr-pink text-white">
-      <AppWindow className="size-3.5" />
-    </div>
-  )
 }
 
 function SearchField({
@@ -115,7 +105,7 @@ function ResultsList({
                 selected ? "bg-accent" : "hover:bg-muted/50",
               )}
             >
-              <AppIcon app={app} />
+              <ApplicationIcon application={app} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">{app.name}</span>
                 <span className="block truncate font-mono text-xs text-muted-foreground">
@@ -202,7 +192,7 @@ export function ApplicationAccessPicker({
                 key={entry.client_id}
                 className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-2.5 py-2"
               >
-                <AppIcon app={app} />
+                <ApplicationIcon application={app} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">
                     {app?.name ?? entry.client_id}

@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query"
 import { Download, Globe, Loader2, Lock } from "lucide-react"
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
 
+import { ApplicationDisplay } from "@/components/ApplicationDisplay"
+import { IdentityDisplay } from "@/components/IdentityDisplay"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -20,14 +22,16 @@ import {
   listFileAccessLogs,
   type DepotFile,
 } from "@/lib/depot"
+import { useApplicationDirectory, useIdentityDirectory } from "@/lib/directory"
 
-function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function Row({ label, value, mono }: { label: string; value: ReactNode; mono?: boolean }) {
+  const empty = value === "" || value === null || value === undefined
   return (
     <div className="flex items-start justify-between gap-4 py-1.5 text-sm">
       <span className="shrink-0 text-muted-foreground">{label}</span>
-      <span className={mono ? "min-w-0 break-all text-right font-mono text-xs" : "min-w-0 truncate text-right"}>
-        {value || "—"}
-      </span>
+      <div className={mono ? "min-w-0 break-all text-right font-mono text-xs" : "min-w-0 text-right"}>
+        {empty ? "—" : value}
+      </div>
     </div>
   )
 }
@@ -52,6 +56,15 @@ export function FileSheet({
     queryFn: () => listFileAccessLogs(file!.bucket_name, file!.id),
     enabled: !!file,
   })
+  const visibleLogs = (logsQuery.data ?? []).slice(0, 20)
+  const identityDirectory = useIdentityDirectory([
+    file?.created_by_entity_id ?? "",
+    ...visibleLogs.map((log) => log.entity_id),
+  ])
+  const applicationDirectory = useApplicationDirectory([
+    file?.created_by_client_id ?? "",
+    ...visibleLogs.map((log) => log.client_id),
+  ])
 
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null)
 
@@ -107,8 +120,27 @@ export function FileSheet({
                 <Row label="Content type" value={file.content_type} />
                 <Row label="Size" value={formatBytes(file.size_bytes)} />
                 <Row label="Storage backend" value={file.storage_backend} mono />
-                <Row label="Uploaded by" value={file.created_by_entity_id} mono />
-                <Row label="Uploaded via" value={file.created_by_client_id} mono />
+                <Row
+                  label="Uploaded by"
+                  value={
+                    <IdentityDisplay
+                      entityID={file.created_by_entity_id}
+                      identity={identityDirectory.byID.get(file.created_by_entity_id)}
+                      loading={identityDirectory.isLoading}
+                      size="sm"
+                    />
+                  }
+                />
+                <Row
+                  label="Uploaded via"
+                  value={
+                    <ApplicationDisplay
+                      clientID={file.created_by_client_id}
+                      application={applicationDirectory.byClientID.get(file.created_by_client_id)}
+                      size="sm"
+                    />
+                  }
+                />
                 <Row label="Created" value={new Date(file.created_at).toLocaleString()} />
                 <Row label="Updated" value={new Date(file.updated_at).toLocaleString()} />
               </div>
@@ -174,20 +206,34 @@ export function FileSheet({
                   <p className="text-xs text-muted-foreground">No recorded activity.</p>
                 ) : (
                   <ul className="space-y-2">
-                    {(logsQuery.data ?? []).slice(0, 20).map((log) => (
-                      <li key={log.id} className="flex items-baseline justify-between gap-3 text-xs">
-                        <span>
-                          {actionLabels[log.action] ?? log.action}
-                          {log.public && " (public)"}
-                          <span className="ml-1.5 font-mono text-muted-foreground">
-                            {log.entity_id || "anonymous"}
-                          </span>
-                          {log.client_id && (
-                            <span className="ml-1.5 font-mono text-muted-foreground">
-                              via {log.client_id}
-                            </span>
-                          )}
-                        </span>
+                    {visibleLogs.map((log) => (
+                      <li key={log.id} className="flex items-start justify-between gap-3 text-xs">
+                        <div className="min-w-0 flex-1">
+                          <p>
+                            {actionLabels[log.action] ?? log.action}
+                            {log.public && " (public)"}
+                          </p>
+                          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                            <IdentityDisplay
+                              entityID={log.entity_id}
+                              identity={identityDirectory.byID.get(log.entity_id)}
+                              loading={identityDirectory.isLoading}
+                              size="sm"
+                              showDetails={false}
+                            />
+                            {log.client_id && (
+                              <>
+                                <span className="text-muted-foreground">via</span>
+                                <ApplicationDisplay
+                                  clientID={log.client_id}
+                                  application={applicationDirectory.byClientID.get(log.client_id)}
+                                  size="sm"
+                                  showClientID={false}
+                                />
+                              </>
+                            )}
+                          </div>
+                        </div>
                         <span className="shrink-0 tabular-nums text-muted-foreground">
                           {new Date(log.created_at).toLocaleString(undefined, {
                             month: "short",

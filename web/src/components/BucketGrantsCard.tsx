@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { AppWindow, Pencil, Plus, Trash2 } from "lucide-react"
+import { Pencil, Plus, Trash2 } from "lucide-react"
 import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
 
+import { ApplicationDisplay } from "@/components/ApplicationDisplay"
 import { ApplicationSelect } from "@/components/ApplicationPicker"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { Badge } from "@/components/ui/badge"
@@ -63,7 +64,8 @@ function GrantFormDialog({
   const [access, setAccess] = useState<BucketAccess>("READ")
   const isEdit = !!grant
   const { data: applications } = useApplications()
-  const appName = applications?.find((app) => app.client_id === grant?.client_id)?.name
+  const application = applications?.find((app) => app.client_id === grant?.client_id)
+  const appName = application?.name
 
   const valid = isEdit || clientID !== ""
 
@@ -102,8 +104,7 @@ function GrantFormDialog({
         {isEdit ? (
           <div className="space-y-3">
             <div className="rounded-lg border border-border px-3 py-2">
-              <p className="text-sm font-medium">{appName ?? grant.client_id}</p>
-              <p className="font-mono text-xs text-muted-foreground">{grant.client_id}</p>
+              <ApplicationDisplay clientID={grant.client_id} application={application} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="grant-access">Access</Label>
@@ -153,6 +154,10 @@ export function BucketGrantsCard({ bucketName }: { bucketName: string }) {
     queryKey: ["grants", bucketName],
     queryFn: () => listBucketGrants(bucketName),
   })
+  const { data: applications } = useApplications()
+  const applicationFor = (clientID: string) =>
+    applications?.find((application) => application.client_id === clientID)
+  const nameFor = (clientID: string) => applicationFor(clientID)?.name ?? clientID
 
   function invalidate() {
     void queryClient.invalidateQueries({ queryKey: ["grants", bucketName] })
@@ -161,7 +166,7 @@ export function BucketGrantsCard({ bucketName }: { bucketName: string }) {
   const createMutation = useMutation({
     mutationFn: (input: BucketGrantInput) => createBucketGrant(bucketName, input),
     onSuccess: (grant) => {
-      toast.success(`${grant.client_id} granted ${grant.access.toLowerCase()} access`)
+      toast.success(`${nameFor(grant.client_id)} granted ${grant.access.toLowerCase()} access`)
       invalidate()
     },
     onError: (error) => {
@@ -196,9 +201,6 @@ export function BucketGrantsCard({ bucketName }: { bucketName: string }) {
   })
 
   const grants = grantsQuery.data ?? []
-  const { data: applications } = useApplications()
-  const nameFor = (clientID: string) =>
-    applications?.find((app) => app.client_id === clientID)?.name
 
   return (
     <Card>
@@ -239,28 +241,20 @@ export function BucketGrantsCard({ bucketName }: { bucketName: string }) {
           <ul className="divide-y divide-border border-t border-border">
             {grants.map((grant) => (
               <li key={grant.id} className="flex flex-wrap items-center gap-3 px-6 py-3">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-gr-purple to-gr-pink text-white">
-                  <AppWindow className="size-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate text-sm font-medium">
-                      {nameFor(grant.client_id) ?? grant.client_id}
-                    </span>
-                    <Badge variant={grant.access === "WRITE" ? "default" : "secondary"}>
-                      {grant.access}
-                    </Badge>
-                  </div>
-                  <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
-                    {grant.client_id}
-                  </p>
-                </div>
+                <ApplicationDisplay
+                  clientID={grant.client_id}
+                  application={applicationFor(grant.client_id)}
+                  className="min-w-0 flex-1"
+                />
+                <Badge variant={grant.access === "WRITE" ? "default" : "secondary"}>
+                  {grant.access}
+                </Badge>
                 <div className="flex shrink-0 gap-1.5">
                   <GrantFormDialog
                     trigger={
                       <Button variant="outline" size="icon">
                         <Pencil className="size-4" />
-                        <span className="sr-only">Edit access for {grant.client_id}</span>
+                        <span className="sr-only">Edit access for {nameFor(grant.client_id)}</span>
                       </Button>
                     }
                     grant={grant}
@@ -277,10 +271,10 @@ export function BucketGrantsCard({ bucketName }: { bucketName: string }) {
                     trigger={
                       <Button variant="outline" size="icon" className="text-destructive">
                         <Trash2 className="size-4" />
-                        <span className="sr-only">Revoke access for {grant.client_id}</span>
+                        <span className="sr-only">Revoke access for {nameFor(grant.client_id)}</span>
                       </Button>
                     }
-                    title={`Revoke access for ${grant.client_id}?`}
+                    title={`Revoke access for ${nameFor(grant.client_id)}?`}
                     description="The application immediately loses access to this bucket. Files it already uploaded are unaffected."
                     confirmLabel="Revoke access"
                     isPending={deleteMutation.isPending}

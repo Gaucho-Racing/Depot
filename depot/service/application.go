@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strings"
 	"sync"
 	"time"
 
@@ -40,4 +41,43 @@ func ListApplications() ([]sentinel.Application, error) {
 	cachedApplications = applications
 	applicationsFetched = time.Now()
 	return applications, nil
+}
+
+func ResolveApplications(clientIDs []string) ([]sentinel.Application, error) {
+	clientIDs = uniqueClientIDs(clientIDs)
+	if len(clientIDs) == 0 {
+		return []sentinel.Application{}, nil
+	}
+	applications, err := ListApplications()
+	if err != nil {
+		return nil, err
+	}
+	byClientID := make(map[string]sentinel.Application, len(applications))
+	for _, application := range applications {
+		byClientID[application.ClientID] = application
+	}
+	resolved := make([]sentinel.Application, 0, len(clientIDs))
+	for _, clientID := range clientIDs {
+		if application, exists := byClientID[clientID]; exists {
+			resolved = append(resolved, application)
+		}
+	}
+	return resolved, nil
+}
+
+func uniqueClientIDs(clientIDs []string) []string {
+	seen := make(map[string]struct{}, len(clientIDs))
+	unique := make([]string, 0, len(clientIDs))
+	for _, clientID := range clientIDs {
+		clientID = strings.TrimSpace(clientID)
+		if clientID == "" {
+			continue
+		}
+		if _, exists := seen[clientID]; exists {
+			continue
+		}
+		seen[clientID] = struct{}{}
+		unique = append(unique, clientID)
+	}
+	return unique
 }
