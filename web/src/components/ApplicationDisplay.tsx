@@ -1,4 +1,4 @@
-import { AppWindow } from "lucide-react"
+import { useState } from "react"
 
 import type { SentinelApplication } from "@/lib/depot"
 import { cn } from "@/lib/utils"
@@ -7,34 +7,42 @@ type ApplicationVisual = Pick<SentinelApplication, "name" | "client_id" | "icon_
 type DisplaySize = "sm" | "md"
 
 const iconSizes: Record<DisplaySize, string> = {
-  sm: "size-6 rounded-md",
-  md: "size-8 rounded-lg",
+  sm: "size-6 rounded-md text-xs",
+  md: "size-8 rounded-lg text-sm",
 }
 
 export function ApplicationIcon({
   application,
+  fallbackName,
   size = "md",
 }: {
   application?: ApplicationVisual
+  fallbackName?: string
   size?: DisplaySize
 }) {
-  if (application?.icon_url) {
-    return (
-      <img
-        src={application.icon_url}
-        alt=""
-        className={cn(iconSizes[size], "shrink-0 object-cover")}
-      />
-    )
-  }
+  const [failedURL, setFailedURL] = useState<string | null>(null)
+  const name = application?.name || fallbackName || application?.client_id || "Unknown application"
+  const imageURL =
+    application?.icon_url && failedURL !== application.icon_url ? application.icon_url : null
+
   return (
     <span
       className={cn(
         iconSizes[size],
-        "flex shrink-0 items-center justify-center bg-gradient-to-br from-gr-purple to-gr-pink text-white",
+        "flex shrink-0 items-center justify-center overflow-hidden",
+        !imageURL && "bg-gradient-to-br from-gr-pink to-gr-purple font-semibold text-white",
       )}
     >
-      <AppWindow className={size === "sm" ? "size-3" : "size-4"} />
+      {imageURL ? (
+        <img
+          src={imageURL}
+          alt={name}
+          className="size-full object-contain"
+          onError={() => setFailedURL(imageURL)}
+        />
+      ) : (
+        (name.slice(0, 1) || "?").toUpperCase()
+      )}
     </span>
   )
 }
@@ -55,7 +63,7 @@ export function ApplicationDisplay({
   const name = application?.name || clientID || "Unknown application"
   return (
     <div className={cn("flex min-w-0 items-center gap-2.5", className)}>
-      <ApplicationIcon application={application} size={size} />
+      <ApplicationIcon application={application} fallbackName={clientID} size={size} />
       <span className="flex min-w-0 flex-col leading-tight">
         <span className={cn("truncate font-medium", size === "sm" ? "text-xs" : "text-sm")}>
           {name}
