@@ -28,6 +28,13 @@ export const router = createBrowserRouter([
           { path: "/buckets/:bucketName/edit", element: <EditBucketPage /> },
           { path: "/search", element: <SearchPage /> },
           { path: "/storage-backends", element: <StorageBackendsPage /> },
+          {
+            path: "/api-docs",
+            lazy: async () => {
+              const { default: Component } = await import("@/pages/ApiDocumentationPage")
+              return { Component }
+            },
+          },
           { path: "/settings", element: <SettingsPage /> },
         ],
       },
