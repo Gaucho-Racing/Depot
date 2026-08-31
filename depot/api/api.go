@@ -52,6 +52,8 @@ func InitializeRoutes(router *gin.Engine) {
 
 	router.GET("/groups", ListSentinelGroups)
 	router.GET("/applications", ListSentinelApplications)
+	router.POST("/applications/resolve", ResolveApplications)
+	router.POST("/identities/resolve", ResolveIdentities)
 
 	router.GET("/stats", GetStats)
 	router.GET("/stats/activity", GetActivityStats)

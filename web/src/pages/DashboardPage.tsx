@@ -11,10 +11,13 @@ import {
   YAxis,
 } from "recharts"
 
+import { ApplicationDisplay } from "@/components/ApplicationDisplay"
+import { IdentityDisplay } from "@/components/IdentityDisplay"
 import { PageContainer, PageHeader } from "@/components/PageContainer"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatBytes, getActivity, getStats } from "@/lib/depot"
+import { useApplicationDirectory, useIdentityDirectory } from "@/lib/directory"
 
 function StatTile({
   label,
@@ -51,6 +54,12 @@ export default function DashboardPage() {
   const activityQuery = useQuery({ queryKey: ["activity", 30], queryFn: () => getActivity(30) })
 
   const stats = statsQuery.data
+  const identityDirectory = useIdentityDirectory(
+    (stats?.top_uploaders ?? []).map((entity) => entity.entity_id),
+  )
+  const applicationDirectory = useApplicationDirectory(
+    (stats?.top_applications ?? []).map((application) => application.client_id),
+  )
   const maxBucketBytes = Math.max(1, ...(stats?.buckets ?? []).map((b) => b.total_bytes))
 
   return (
@@ -213,9 +222,13 @@ export default function DashboardPage() {
                     <span className="w-5 shrink-0 font-mono text-xs text-muted-foreground">
                       {index + 1}
                     </span>
-                    <span className="min-w-0 flex-1 truncate font-mono text-xs">
-                      {entity.entity_id}
-                    </span>
+                    <IdentityDisplay
+                      entityID={entity.entity_id}
+                      identity={identityDirectory.byID.get(entity.entity_id)}
+                      loading={identityDirectory.isLoading}
+                      size="sm"
+                      className="min-w-0 flex-1"
+                    />
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {entity.file_count} file{entity.file_count === 1 ? "" : "s"} ·{" "}
                       {formatBytes(entity.total_bytes)}
@@ -250,9 +263,13 @@ export default function DashboardPage() {
                     <span className="w-5 shrink-0 font-mono text-xs text-muted-foreground">
                       {index + 1}
                     </span>
-                    <span className="min-w-0 flex-1 truncate font-mono text-xs">
-                      {app.client_id}
-                    </span>
+                    <ApplicationDisplay
+                      clientID={app.client_id}
+                      application={applicationDirectory.byClientID.get(app.client_id)}
+                      size="sm"
+                      showClientID={false}
+                      className="min-w-0 flex-1"
+                    />
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {app.file_count} file{app.file_count === 1 ? "" : "s"} ·{" "}
                       {formatBytes(app.total_bytes)}

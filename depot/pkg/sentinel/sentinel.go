@@ -1,6 +1,8 @@
 package sentinel
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -53,6 +55,22 @@ type Application struct {
 	Description string `json:"description"`
 	ClientID    string `json:"client_id"`
 	IconURL     string `json:"icon_url"`
+}
+
+type IdentityApplicationSummary struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	ClientID string `json:"client_id"`
+	IconURL  string `json:"icon_url"`
+}
+
+type IdentitySummary struct {
+	ID          string                      `json:"id"`
+	Type        string                      `json:"type"`
+	Name        string                      `json:"name"`
+	Username    string                      `json:"username,omitempty"`
+	AvatarURL   string                      `json:"avatar_url,omitempty"`
+	Application *IdentityApplicationSummary `json:"application,omitempty"`
 }
 
 type Group struct {
@@ -236,6 +254,53 @@ func GetApplications() ([]Application, error) {
 		return []Application{}, err
 	}
 	return applications, nil
+}
+
+func ResolveIdentities(ctx context.Context, entityIDs []string) ([]IdentitySummary, error) {
+	if strings.TrimSpace(config.SentinelURL) == "" {
+		return nil, fmt.Errorf("SENTINEL_URL is not configured")
+	}
+	accessToken := strings.TrimSpace(config.SentinelSAToken)
+	if accessToken == "" {
+		return nil, fmt.Errorf("SENTINEL_SA_TOKEN is not configured")
+	}
+
+	requestBody, err := json.Marshal(map[string][]string{"ids": entityIDs})
+	if err != nil {
+		return nil, fmt.Errorf("encode identity summary request: %w", err)
+	}
+	requestURL := strings.TrimRight(config.SentinelURL, "/") + "/api/entities/resolve"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, bytes.NewReader(requestBody))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		var sentinelErr Error
+		if err := json.Unmarshal(respBody, &sentinelErr); err == nil && sentinelErr.Message != "" {
+			sentinelErr.Code = resp.StatusCode
+			return nil, sentinelErr
+		}
+		return nil, Error{Code: resp.StatusCode, Message: strings.TrimSpace(string(respBody))}
+	}
+
+	summaries := []IdentitySummary{}
+	if err := json.Unmarshal(respBody, &summaries); err != nil {
+		return nil, err
+	}
+	return summaries, nil
 }
 
 func exchangeToken(form url.Values) (TokenResponse, error) {
