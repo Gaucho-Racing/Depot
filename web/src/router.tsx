@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom"
 
 import { AppShell } from "@/components/AppShell"
 import { RequireAuth } from "@/components/RequireAuth"
+import AttributionDetailsPage from "@/pages/AttributionDetailsPage"
 import BucketDetailsPage from "@/pages/BucketDetailsPage"
 import BucketsPage from "@/pages/BucketsPage"
 import EditBucketPage from "@/pages/EditBucketPage"
@@ -22,6 +23,11 @@ export const router = createBrowserRouter([
         children: [
           { path: "/", element: <Navigate to="/dashboard" replace /> },
           { path: "/dashboard", element: <DashboardPage /> },
+          { path: "/uploaders/:entityID", element: <AttributionDetailsPage kind="uploader" /> },
+          {
+            path: "/applications/:clientID",
+            element: <AttributionDetailsPage kind="application" />,
+          },
           { path: "/buckets", element: <BucketsPage /> },
           { path: "/buckets/new", element: <NewBucketPage /> },
           { path: "/buckets/:bucketName", element: <BucketDetailsPage /> },

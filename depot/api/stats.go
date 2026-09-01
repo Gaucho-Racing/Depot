@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gaucho-racing/depot/depot/service"
 	"github.com/gin-gonic/gin"
@@ -57,4 +58,32 @@ func GetActivityStats(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, points)
+}
+
+func GetUploaderStats(c *gin.Context) {
+	getAttributionStats(c, service.AttributionFilter{EntityID: strings.TrimSpace(c.Param("entityID"))})
+}
+
+func GetApplicationStats(c *gin.Context) {
+	getAttributionStats(c, service.AttributionFilter{ClientID: strings.TrimSpace(c.Param("clientID"))})
+}
+
+func getAttributionStats(c *gin.Context, filter service.AttributionFilter) {
+	Require(c, RequestTokenExists(c))
+	if filter.EntityID == "" && filter.ClientID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "attribution identifier is required"})
+		return
+	}
+
+	bucketIDs, err := accessibleBucketIDs(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	stats, err := service.GetAttributionStats(bucketIDs, filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, stats)
 }

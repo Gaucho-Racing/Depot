@@ -222,13 +222,17 @@ export default function DashboardPage() {
                     <span className="w-5 shrink-0 font-mono text-xs text-muted-foreground">
                       {index + 1}
                     </span>
-                    <IdentityDisplay
-                      entityID={entity.entity_id}
-                      identity={identityDirectory.byID.get(entity.entity_id)}
-                      loading={identityDirectory.isLoading}
-                      size="sm"
-                      className="min-w-0 flex-1"
-                    />
+                    <Link
+                      to={`/uploaders/${encodeURIComponent(entity.entity_id)}`}
+                      className="min-w-0 flex-1 rounded-md hover:text-gr-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <IdentityDisplay
+                        entityID={entity.entity_id}
+                        identity={identityDirectory.byID.get(entity.entity_id)}
+                        loading={identityDirectory.isLoading}
+                        size="sm"
+                      />
+                    </Link>
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {entity.file_count} file{entity.file_count === 1 ? "" : "s"} ·{" "}
                       {formatBytes(entity.total_bytes)}
@@ -263,13 +267,17 @@ export default function DashboardPage() {
                     <span className="w-5 shrink-0 font-mono text-xs text-muted-foreground">
                       {index + 1}
                     </span>
-                    <ApplicationDisplay
-                      clientID={app.client_id}
-                      application={applicationDirectory.byClientID.get(app.client_id)}
-                      size="sm"
-                      showClientID={false}
-                      className="min-w-0 flex-1"
-                    />
+                    <Link
+                      to={`/applications/${encodeURIComponent(app.client_id)}`}
+                      className="min-w-0 flex-1 rounded-md hover:text-gr-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <ApplicationDisplay
+                        clientID={app.client_id}
+                        application={applicationDirectory.byClientID.get(app.client_id)}
+                        size="sm"
+                        showClientID={false}
+                      />
+                    </Link>
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {app.file_count} file{app.file_count === 1 ? "" : "s"} ·{" "}
                       {formatBytes(app.total_bytes)}
