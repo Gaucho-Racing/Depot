@@ -57,6 +57,7 @@ func InitializeRoutes(router *gin.Engine) {
 
 	router.GET("/stats", GetStats)
 	router.GET("/stats/activity", GetActivityStats)
+	router.GET("/search", OmniSearch)
 	router.GET("/files/search", SearchFiles)
 
 	// Files are addressed by id alone here: the id determines the bucket, so a

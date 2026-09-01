@@ -1,4 +1,4 @@
-import { BookOpen, Container, Database, LayoutDashboard, Package, Search, Settings } from "lucide-react"
+import { BookOpen, Container, Database, LayoutDashboard, Package, Settings } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
 
 import { Badge } from "@/components/ui/badge"
@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils"
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/buckets", label: "Buckets", icon: Package },
-  { to: "/search", label: "Search", icon: Search },
   { to: "/storage-backends", label: "Storage Backends", icon: Database },
   { to: "/api-docs", label: "API Docs", icon: BookOpen },
   { to: "/settings", label: "Settings", icon: Settings },

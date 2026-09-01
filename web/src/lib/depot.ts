@@ -166,6 +166,30 @@ export type SentinelGroup = {
   member_count: number
 }
 
+export type SearchResultType =
+  | "bucket"
+  | "file"
+  | "storage_backend"
+  | "bucket_grant"
+  | "file_replica"
+  | "access_log"
+  | "application"
+  | "uploader"
+
+export type SearchResult = {
+  type: SearchResultType
+  id: string
+  title: string
+  subtitle: string
+  href: string
+  icon_url?: string
+}
+
+export type OmniSearchResponse = {
+  query: string
+  results: SearchResult[]
+}
+
 export type BucketInput = {
   name: string
   description: string
@@ -269,6 +293,18 @@ export async function listFiles(
   const response = await api.get<DepotFile[]>(`/buckets/${encodeURIComponent(bucket)}/files`, {
     params,
   })
+  return response.data
+}
+
+export async function getFile(bucket: string, id: string) {
+  const response = await api.get<DepotFile>(
+    `/buckets/${encodeURIComponent(bucket)}/files/${encodeURIComponent(id)}`,
+  )
+  return response.data
+}
+
+export async function omniSearch(q: string, limit = 30) {
+  const response = await api.get<OmniSearchResponse>("/search", { params: { q, limit } })
   return response.data
 }
 

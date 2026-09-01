@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { FileIcon, Globe, Lock, Pencil, Search, Upload } from "lucide-react"
 import { useState } from "react"
-import { Link, useParams } from "react-router-dom"
+import { Link, useParams, useSearchParams } from "react-router-dom"
 
 import { FileSheet } from "@/components/FileSheet"
 import { PageContainer, PageHeader } from "@/components/PageContainer"
@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth"
 import {
   formatBytes,
   getBucket,
+  getFile,
   getStats,
   listBucketGrants,
   listFiles,
@@ -31,10 +32,12 @@ function SummaryTile({ label, value }: { label: string; value: string }) {
 
 export default function BucketDetailsPage() {
   const { bucketName = "" } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { isAdmin } = useAuth()
 
   const [search, setSearch] = useState("")
   const [selectedFile, setSelectedFile] = useState<DepotFile | null>(null)
+  const linkedFileID = searchParams.get("file") ?? ""
 
   const bucketQuery = useQuery({
     queryKey: ["bucket", bucketName],
@@ -44,6 +47,11 @@ export default function BucketDetailsPage() {
     queryKey: ["files", bucketName, search],
     queryFn: () => listFiles(bucketName, { q: search || undefined, limit: 200 }),
   })
+  const linkedFileQuery = useQuery({
+    queryKey: ["file", bucketName, linkedFileID],
+    queryFn: () => getFile(bucketName, linkedFileID),
+    enabled: linkedFileID !== "",
+  })
   const statsQuery = useQuery({ queryKey: ["stats"], queryFn: getStats })
   const grantsQuery = useQuery({
     queryKey: ["grants", bucketName],
@@ -52,6 +60,7 @@ export default function BucketDetailsPage() {
 
   const bucket = bucketQuery.data
   const files = filesQuery.data ?? []
+  const activeFile = selectedFile ?? linkedFileQuery.data ?? null
   const bucketStats = statsQuery.data?.buckets.find((entry) => entry.bucket_id === bucket?.id)
 
   const grants = grantsQuery.data
@@ -184,7 +193,17 @@ export default function BucketDetailsPage() {
         </Card>
       )}
 
-      <FileSheet file={selectedFile} onClose={() => setSelectedFile(null)} />
+      <FileSheet
+        file={activeFile}
+        onClose={() => {
+          setSelectedFile(null)
+          if (linkedFileID) {
+            const next = new URLSearchParams(searchParams)
+            next.delete("file")
+            setSearchParams(next, { replace: true })
+          }
+        }}
+      />
     </PageContainer>
   )
 }
