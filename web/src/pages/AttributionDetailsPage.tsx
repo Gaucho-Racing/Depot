@@ -24,7 +24,17 @@ const PAGE_SIZE = 50
 
 type AttributionKind = "uploader" | "application"
 
-function StatTile({ label, value, loading }: { label: string; value: string; loading: boolean }) {
+function StatTile({
+  label,
+  value,
+  loading,
+  error,
+}: {
+  label: string
+  value: string
+  loading: boolean
+  error: boolean
+}) {
   return (
     <Card>
       <CardContent className="py-4">
@@ -32,7 +42,9 @@ function StatTile({ label, value, loading }: { label: string; value: string; loa
         {loading ? (
           <Skeleton className="mt-1.5 h-6 w-20" />
         ) : (
-          <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums">
+            {error ? "Unavailable" : value}
+          </p>
         )}
       </CardContent>
     </Card>
@@ -115,15 +127,37 @@ export default function AttributionDetailsPage({ kind }: { kind: AttributionKind
       </Card>
 
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Files" value={String(stats?.file_count ?? 0)} loading={statsQuery.isLoading} />
-        <StatTile label="Storage used" value={formatBytes(stats?.total_bytes ?? 0)} loading={statsQuery.isLoading} />
-        <StatTile label="Buckets" value={String(stats?.bucket_count ?? 0)} loading={statsQuery.isLoading} />
-        <StatTile label="Public files" value={String(stats?.public_files ?? 0)} loading={statsQuery.isLoading} />
+        <StatTile
+          label="Files"
+          value={String(stats?.file_count ?? 0)}
+          loading={statsQuery.isLoading}
+          error={statsQuery.isError}
+        />
+        <StatTile
+          label="Storage used"
+          value={formatBytes(stats?.total_bytes ?? 0)}
+          loading={statsQuery.isLoading}
+          error={statsQuery.isError}
+        />
+        <StatTile
+          label="Buckets"
+          value={String(stats?.bucket_count ?? 0)}
+          loading={statsQuery.isLoading}
+          error={statsQuery.isError}
+        />
+        <StatTile
+          label="Public files"
+          value={String(stats?.public_files ?? 0)}
+          loading={statsQuery.isLoading}
+          error={statsQuery.isError}
+        />
       </div>
 
       <p className="mb-6 text-xs text-muted-foreground">
         {statsQuery.isLoading
           ? "Loading upload history..."
+          : statsQuery.isError
+            ? "Could not load attribution statistics."
           : formatUploadRange(stats?.first_upload_at, stats?.last_upload_at)}
       </p>
 
@@ -136,6 +170,10 @@ export default function AttributionDetailsPage({ kind }: { kind: AttributionKind
           <CardContent className="space-y-3">
             {statsQuery.isLoading ? (
               Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-10 w-full" />)
+            ) : statsQuery.isError ? (
+              <p className="py-4 text-sm text-muted-foreground">
+                Could not load bucket statistics.
+              </p>
             ) : (stats?.buckets ?? []).length === 0 ? (
               <p className="py-4 text-sm text-muted-foreground">No bucket activity.</p>
             ) : (
