@@ -170,6 +170,58 @@ func SearchFiles(c *gin.Context) {
 	c.JSON(http.StatusOK, files)
 }
 
+type attributionFilePage struct {
+	Files      []model.File `json:"files"`
+	NextOffset *int         `json:"next_offset,omitempty"`
+}
+
+func ListAttributionFiles(c *gin.Context) {
+	Require(c, RequestTokenExists(c))
+
+	entityID := strings.TrimSpace(c.Query("uploader_entity_id"))
+	clientID := strings.TrimSpace(c.Query("application_client_id"))
+	if (entityID == "") == (clientID == "") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "provide exactly one uploader_entity_id or application_client_id"})
+		return
+	}
+	limit, offset, ok := parseListParams(c)
+	if !ok {
+		return
+	}
+
+	bucketIDs, err := accessibleBucketIDs(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if len(bucketIDs) == 0 {
+		c.JSON(http.StatusOK, attributionFilePage{Files: []model.File{}})
+		return
+	}
+
+	files, err := service.ListFiles(service.FileQuery{
+		BucketIDs:         bucketIDs,
+		Search:            strings.TrimSpace(c.Query("q")),
+		CreatedByEntityID: entityID,
+		CreatedByClientID: clientID,
+		Status:            model.FileStatusActive,
+		Limit:             limit + 1,
+		Offset:            offset,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	page := attributionFilePage{Files: files}
+	if len(files) > limit {
+		nextOffset := offset + limit
+		page.Files = files[:limit]
+		page.NextOffset = &nextOffset
+	}
+	c.JSON(http.StatusOK, page)
+}
+
 func UploadFile(c *gin.Context) {
 	bucket, ok := findBucket(c)
 	if !ok {

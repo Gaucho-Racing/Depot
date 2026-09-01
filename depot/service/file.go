@@ -42,12 +42,14 @@ func GetBucketFileByID(bucketID string, fileID string) (model.File, error) {
 }
 
 type FileQuery struct {
-	BucketIDs  []string
-	PathPrefix string
-	Search     string
-	Status     model.FileStatus
-	Limit      int
-	Offset     int
+	BucketIDs         []string
+	PathPrefix        string
+	Search            string
+	CreatedByEntityID string
+	CreatedByClientID string
+	Status            model.FileStatus
+	Limit             int
+	Offset            int
 }
 
 func ListFiles(q FileQuery) ([]model.File, error) {
@@ -59,6 +61,12 @@ func ListFiles(q FileQuery) ([]model.File, error) {
 	if q.Search != "" {
 		pattern := "%" + q.Search + "%"
 		query = query.Where("original_name ILIKE ? OR path ILIKE ?", pattern, pattern)
+	}
+	if q.CreatedByEntityID != "" {
+		query = query.Where("created_by_entity_id = ?", q.CreatedByEntityID)
+	}
+	if q.CreatedByClientID != "" {
+		query = query.Where("created_by_client_id = ?", q.CreatedByClientID)
 	}
 	if q.Status != "" {
 		query = query.Where("status = ?", q.Status)

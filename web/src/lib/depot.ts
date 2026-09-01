@@ -144,6 +144,21 @@ export type Stats = {
   top_applications: ApplicationStats[]
 }
 
+export type AttributionStats = {
+  file_count: number
+  total_bytes: number
+  bucket_count: number
+  public_files: number
+  first_upload_at?: string
+  last_upload_at?: string
+  buckets: BucketStats[]
+}
+
+export type AttributionFilePage = {
+  files: DepotFile[]
+  next_offset?: number
+}
+
 export type ActivityPoint = {
   date: string
   uploads: number
@@ -313,6 +328,20 @@ export async function searchFiles(q: string, limit = 50) {
   return response.data
 }
 
+export async function listAttributionFiles(
+  kind: "uploader" | "application",
+  identifier: string,
+  params: { q?: string; limit?: number; offset?: number } = {},
+) {
+  const response = await api.get<AttributionFilePage>("/files", {
+    params: {
+      ...params,
+      [kind === "uploader" ? "uploader_entity_id" : "application_client_id"]: identifier,
+    },
+  })
+  return response.data
+}
+
 export async function uploadFile(
   bucket: string,
   input: {
@@ -401,6 +430,17 @@ export async function listFileAccessLogs(bucket: string, id: string) {
 
 export async function getStats() {
   const response = await api.get<Stats>("/stats")
+  return response.data
+}
+
+export async function getAttributionStats(
+  kind: "uploader" | "application",
+  identifier: string,
+) {
+  const segment = kind === "uploader" ? "uploaders" : "applications"
+  const response = await api.get<AttributionStats>(
+    `/stats/${segment}/${encodeURIComponent(identifier)}`,
+  )
   return response.data
 }
 

@@ -58,11 +58,11 @@ func InitializeRoutes(router *gin.Engine) {
 	router.GET("/stats", GetStats)
 	router.GET("/stats/activity", GetActivityStats)
 	router.GET("/search", OmniSearch)
+	router.GET("/stats/uploaders/:entityID", GetUploaderStats)
+	router.GET("/stats/applications/:clientID", GetApplicationStats)
+	router.GET("/files", ListAttributionFiles)
 	router.GET("/files/search", SearchFiles)
-
-	// Files are addressed by id alone here: the id determines the bucket, so a
-	// consumer stores one reference, and a public file gets a URL it can be
-	// embedded with.
+  
 	router.GET("/download/:fileID", DownloadFile)
 
 	router.GET("/storage-backends", ListStorageBackends)
@@ -83,8 +83,6 @@ func InitializeRoutes(router *gin.Engine) {
 	router.PATCH("/buckets/:bucketName/grants/:clientID", UpdateBucketGrant)
 	router.DELETE("/buckets/:bucketName/grants/:clientID", DeleteBucketGrant)
 
-	// File routes an application reaches with its own token, resolved by the
-	// bucket's grants.
 	router.GET("/buckets/:bucketName/files", ListFiles)
 	router.POST("/buckets/:bucketName/files", UploadFile)
 	router.GET("/buckets/:bucketName/files/:id", GetFile)
