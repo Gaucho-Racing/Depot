@@ -11,6 +11,7 @@ import (
 )
 
 const identityCacheTTL = 5 * time.Minute
+const identityResolveBatchSize = 100
 
 type cachedIdentity struct {
 	summary   sentinel.IdentitySummary
@@ -41,16 +42,19 @@ func ResolveIdentities(ctx context.Context, entityIDs []string) ([]sentinel.Iden
 	}
 
 	if len(missing) > 0 {
-		resolved, err := sentinel.ResolveIdentities(ctx, missing)
-		if err != nil {
-			if summaries, complete := cachedIdentityResults(entityIDs); complete {
-				logger.SugarLogger.Warnf("serving stale identity summaries, refresh failed: %v", err)
-				return summaries, nil
+		for start := 0; start < len(missing); start += identityResolveBatchSize {
+			end := min(start+identityResolveBatchSize, len(missing))
+			resolved, err := sentinel.ResolveIdentities(ctx, missing[start:end])
+			if err != nil {
+				if summaries, complete := cachedIdentityResults(entityIDs); complete {
+					logger.SugarLogger.Warnf("serving stale identity summaries, refresh failed: %v", err)
+					return summaries, nil
+				}
+				return nil, err
 			}
-			return nil, err
-		}
-		for _, summary := range resolved {
-			cachedIdentities[summary.ID] = cachedIdentity{summary: summary, fetchedAt: now}
+			for _, summary := range resolved {
+				cachedIdentities[summary.ID] = cachedIdentity{summary: summary, fetchedAt: now}
+			}
 		}
 	}
 

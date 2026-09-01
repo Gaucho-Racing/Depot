@@ -1,8 +1,9 @@
-import { BookOpen, Container, Database, LayoutDashboard, LogOut, Menu, Package, Search, Settings } from "lucide-react"
+import { BookOpen, Container, Database, LayoutDashboard, LogOut, Menu, Package, Settings } from "lucide-react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { HeaderSearch } from "@/components/HeaderSearch"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,7 +19,6 @@ import { cn } from "@/lib/utils"
 const mobileItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/buckets", label: "Buckets", icon: Package },
-  { to: "/search", label: "Search", icon: Search },
   { to: "/storage-backends", label: "Storage Backends", icon: Database },
   { to: "/api-docs", label: "API Docs", icon: BookOpen },
   { to: "/settings", label: "Settings", icon: Settings },
@@ -28,7 +28,6 @@ function sectionTitle(pathname: string) {
   if (pathname.startsWith("/api-docs")) return "API Documentation"
   if (pathname.startsWith("/settings")) return "Settings"
   if (pathname.startsWith("/storage-backends")) return "Storage Backends"
-  if (pathname.startsWith("/search")) return "Search"
   if (pathname.startsWith("/buckets")) return "Buckets"
   if (pathname.startsWith("/dashboard")) return "Dashboard"
   return "Depot"
@@ -128,6 +127,7 @@ export function AppHeader() {
 
       <div className="flex-1" />
 
+      <HeaderSearch />
       <HeaderUserMenu />
     </header>
   )

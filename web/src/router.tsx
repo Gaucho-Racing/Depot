@@ -10,7 +10,6 @@ import DashboardPage from "@/pages/DashboardPage"
 import LoginPage from "@/pages/LoginPage"
 import NewBucketPage from "@/pages/NewBucketPage"
 import NotFoundPage from "@/pages/NotFoundPage"
-import SearchPage from "@/pages/SearchPage"
 import SettingsPage from "@/pages/SettingsPage"
 import StorageBackendsPage from "@/pages/StorageBackendsPage"
 
@@ -32,7 +31,7 @@ export const router = createBrowserRouter([
           { path: "/buckets/new", element: <NewBucketPage /> },
           { path: "/buckets/:bucketName", element: <BucketDetailsPage /> },
           { path: "/buckets/:bucketName/edit", element: <EditBucketPage /> },
-          { path: "/search", element: <SearchPage /> },
+          { path: "/search", element: <Navigate to="/dashboard" replace /> },
           { path: "/storage-backends", element: <StorageBackendsPage /> },
           {
             path: "/api-docs",
