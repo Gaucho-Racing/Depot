@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
 import { deleteBucket, errorMessage, getBucket, updateBucket, type Bucket } from "@/lib/depot"
@@ -64,6 +65,18 @@ function BucketSettingsForm({ bucket }: { bucket: Bucket }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="bucket-primary-storage-backend">Primary storage backend</Label>
+          <Input
+            id="bucket-primary-storage-backend"
+            value={bucket.primary_storage_backend}
+            disabled
+          />
+          <p className="text-xs text-muted-foreground">
+            The primary storage backend cannot be changed after bucket creation.
+          </p>
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="bucket-description">Description</Label>
           <Textarea

@@ -107,21 +107,20 @@ func attachReplicasBatch(files []model.File) []model.File {
 	return files
 }
 
-// ResolveUploadBackends validates the requested primary + replica storage
-// backend names, falling back to the default backend when no primary is named.
-func ResolveUploadBackends(primaryName string, replicaNames []string) (model.StorageBackend, []model.StorageBackend, error) {
-	var primary model.StorageBackend
-	var err error
+// ResolveUploadBackends validates a bucket's fixed primary backend and any
+// per-upload replicas. Clients may repeat the primary name for compatibility,
+// but cannot route an upload to a different primary backend.
+func ResolveUploadBackends(bucket model.Bucket, requestedPrimary string, replicaNames []string) (model.StorageBackend, []model.StorageBackend, error) {
+	primaryName := bucket.PrimaryStorageBackend
 	if primaryName == "" {
-		primary, err = DefaultStorageBackend()
-		if err != nil {
-			return model.StorageBackend{}, nil, err
-		}
-	} else {
-		primary, err = GetStorageBackendByName(primaryName)
-		if err != nil {
-			return model.StorageBackend{}, nil, fmt.Errorf("unknown storage backend %q", primaryName)
-		}
+		return model.StorageBackend{}, nil, fmt.Errorf("bucket %q has no primary storage backend", bucket.Name)
+	}
+	if requestedPrimary != "" && requestedPrimary != primaryName {
+		return model.StorageBackend{}, nil, fmt.Errorf("bucket %q uses primary storage backend %q", bucket.Name, primaryName)
+	}
+	primary, err := GetStorageBackendByName(primaryName)
+	if err != nil {
+		return model.StorageBackend{}, nil, fmt.Errorf("unknown primary storage backend %q", primaryName)
 	}
 	if !primary.Enabled {
 		return model.StorageBackend{}, nil, fmt.Errorf("storage backend %q is disabled", primary.Name)
@@ -158,7 +157,7 @@ func (r *countingReader) Read(p []byte) (int, error) {
 }
 
 func UploadFile(ctx context.Context, bucket model.Bucket, file model.File, body io.Reader, primaryName string, replicaNames []string) (model.File, error) {
-	primary, replicaBackends, err := ResolveUploadBackends(primaryName, replicaNames)
+	primary, replicaBackends, err := ResolveUploadBackends(bucket, primaryName, replicaNames)
 	if err != nil {
 		return model.File{}, err
 	}
@@ -193,7 +192,7 @@ func UploadFile(ctx context.Context, bucket model.Bucket, file model.File, body 
 }
 
 func InitiateUpload(ctx context.Context, bucket model.Bucket, file model.File, primaryName string, replicaNames []string) (model.File, storage.PresignedRequest, error) {
-	primary, replicaBackends, err := ResolveUploadBackends(primaryName, replicaNames)
+	primary, replicaBackends, err := ResolveUploadBackends(bucket, primaryName, replicaNames)
 	if err != nil {
 		return model.File{}, storage.PresignedRequest{}, err
 	}

@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/gaucho-racing/depot/depot/model"
 	"github.com/gaucho-racing/depot/depot/pkg/storage"
 	ulid "github.com/gaucho-racing/ulid-go"
+	"gorm.io/gorm"
 )
 
 func ListStorageBackends() ([]model.StorageBackend, error) {
@@ -29,13 +31,22 @@ func GetStorageBackendByName(name string) (model.StorageBackend, error) {
 	return backend, nil
 }
 
-func DefaultStorageBackend() (model.StorageBackend, error) {
+func preferredStorageBackend() (model.StorageBackend, error) {
 	var backend model.StorageBackend
-	if err := database.DB.Where("\"default\" = true AND enabled = true").First(&backend).Error; err == nil {
+	err := database.DB.Where("\"default\" = true AND enabled = true").First(&backend).Error
+	if err == nil {
 		return backend, nil
 	}
-	if err := database.DB.Where("enabled = true").Order("created_at asc").First(&backend).Error; err != nil {
-		return model.StorageBackend{}, fmt.Errorf("no enabled storage backend is configured")
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return model.StorageBackend{}, err
+	}
+	return backend, database.DB.Where("enabled = true").Order("created_at asc").First(&backend).Error
+}
+
+func DefaultStorageBackend() (model.StorageBackend, error) {
+	backend, err := preferredStorageBackend()
+	if err != nil {
+		return model.StorageBackend{}, fmt.Errorf("no enabled storage backend is configured: %w", err)
 	}
 	return backend, nil
 }
@@ -68,6 +79,9 @@ func CreateStorageBackend(backend model.StorageBackend) (model.StorageBackend, e
 	if err := database.DB.Create(&backend).Error; err != nil {
 		return model.StorageBackend{}, err
 	}
+	if _, err := BackfillBucketPrimaryStorageBackends(); err != nil {
+		return model.StorageBackend{}, err
+	}
 	if err := RebuildStorageBackends(); err != nil {
 		return model.StorageBackend{}, err
 	}
@@ -86,6 +100,9 @@ func UpdateStorageBackend(backend model.StorageBackend) (model.StorageBackend, e
 	if err := database.DB.Save(&backend).Error; err != nil {
 		return model.StorageBackend{}, err
 	}
+	if _, err := BackfillBucketPrimaryStorageBackends(); err != nil {
+		return model.StorageBackend{}, err
+	}
 	if err := RebuildStorageBackends(); err != nil {
 		return model.StorageBackend{}, err
 	}
@@ -93,6 +110,13 @@ func UpdateStorageBackend(backend model.StorageBackend) (model.StorageBackend, e
 }
 
 func DeleteStorageBackend(backend model.StorageBackend) error {
+	var bucketCount int64
+	if err := database.DB.Model(&model.Bucket{}).Where("primary_storage_backend = ?", backend.Name).Count(&bucketCount).Error; err != nil {
+		return err
+	}
+	if bucketCount > 0 {
+		return fmt.Errorf("storage backend %s is primary for %d buckets", backend.Name, bucketCount)
+	}
 	var fileCount int64
 	if err := database.DB.Model(&model.File{}).Where("storage_backend = ?", backend.Name).Count(&fileCount).Error; err != nil {
 		return err

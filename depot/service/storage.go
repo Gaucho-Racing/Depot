@@ -41,6 +41,14 @@ func InitializeStorage() {
 		logger.SugarLogger.Infof("Seeded default storage backend %q from env config (bucket: %s)", seed.Name, seed.Bucket)
 	}
 
+	backfilled, err := BackfillBucketPrimaryStorageBackends()
+	if err != nil {
+		logger.SugarLogger.Fatalf("failed to backfill bucket primary storage backends: %v", err)
+	}
+	if backfilled > 0 {
+		logger.SugarLogger.Infof("Assigned the preferred storage backend to %d existing buckets", backfilled)
+	}
+
 	if err := RebuildStorageBackends(); err != nil {
 		logger.SugarLogger.Fatalf("failed to initialize storage backends: %v", err)
 	}

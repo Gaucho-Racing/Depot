@@ -1,12 +1,14 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 
 	"github.com/gaucho-racing/depot/depot/database"
 	"github.com/gaucho-racing/depot/depot/model"
 	ulid "github.com/gaucho-racing/ulid-go"
+	"gorm.io/gorm"
 )
 
 var bucketNameRegex = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{1,61}[a-z0-9])?$`)
@@ -46,6 +48,16 @@ func CreateBucket(bucket model.Bucket) (model.Bucket, error) {
 	if err := ValidateBucketName(bucket.Name); err != nil {
 		return model.Bucket{}, err
 	}
+	backend, err := GetStorageBackendByName(bucket.PrimaryStorageBackend)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return model.Bucket{}, fmt.Errorf("unknown primary storage backend %q", bucket.PrimaryStorageBackend)
+		}
+		return model.Bucket{}, err
+	}
+	if !backend.Enabled {
+		return model.Bucket{}, fmt.Errorf("primary storage backend %q is disabled", backend.Name)
+	}
 	bucket.ID = ulid.Make().Prefixed("bkt")
 	if err := database.DB.Create(&bucket).Error; err != nil {
 		return model.Bucket{}, err
@@ -54,10 +66,29 @@ func CreateBucket(bucket model.Bucket) (model.Bucket, error) {
 }
 
 func UpdateBucket(bucket model.Bucket) (model.Bucket, error) {
-	if err := database.DB.Save(&bucket).Error; err != nil {
+	if err := database.DB.Model(&bucket).Select(
+		"description",
+		"allow_public_files",
+		"allow_authenticated_read",
+		"updated_by_entity_id",
+	).Updates(bucket).Error; err != nil {
 		return model.Bucket{}, err
 	}
-	return bucket, nil
+	return GetBucketByID(bucket.ID)
+}
+
+func BackfillBucketPrimaryStorageBackends() (int64, error) {
+	backend, err := preferredStorageBackend()
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	result := database.DB.Model(&model.Bucket{}).
+		Where("primary_storage_backend IS NULL OR primary_storage_backend = ''").
+		Update("primary_storage_backend", backend.Name)
+	return result.RowsAffected, result.Error
 }
 
 func CountFilesInBucket(bucketID string) (int64, error) {

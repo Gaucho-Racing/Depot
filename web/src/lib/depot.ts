@@ -4,6 +4,7 @@ export type Bucket = {
   id: string
   name: string
   description: string
+  primary_storage_backend: string
   allow_public_files: boolean
   allow_authenticated_read: boolean
   created_by_entity_id: string
@@ -208,9 +209,12 @@ export type OmniSearchResponse = {
 export type BucketInput = {
   name: string
   description: string
+  primary_storage_backend: string
   allow_public_files: boolean
   allow_authenticated_read: boolean
 }
+
+export type BucketUpdateInput = Omit<BucketInput, "name" | "primary_storage_backend">
 
 export async function listStorageBackends() {
   const response = await api.get<StorageBackend[]>("/storage-backends")
@@ -263,7 +267,7 @@ export async function createBucket(input: BucketInput) {
   return response.data
 }
 
-export async function updateBucket(name: string, input: Omit<BucketInput, "name">) {
+export async function updateBucket(name: string, input: BucketUpdateInput) {
   const response = await api.put<Bucket>(`/buckets/${encodeURIComponent(name)}`, input)
   return response.data
 }

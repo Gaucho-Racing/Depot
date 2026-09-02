@@ -3,10 +3,11 @@ package model
 import "time"
 
 type Bucket struct {
-	ID               string `json:"id" gorm:"primaryKey"`
-	Name             string `json:"name" gorm:"uniqueIndex"`
-	Description      string `json:"description"`
-	AllowPublicFiles bool   `json:"allow_public_files"`
+	ID                    string `json:"id" gorm:"primaryKey"`
+	Name                  string `json:"name" gorm:"uniqueIndex"`
+	Description           string `json:"description"`
+	PrimaryStorageBackend string `json:"primary_storage_backend" gorm:"index"`
+	AllowPublicFiles      bool   `json:"allow_public_files"`
 	// AllowAuthenticatedRead opens reads to any valid Sentinel token, whoever
 	// it belongs to. Writes still require a WRITE grant.
 	AllowAuthenticatedRead bool      `json:"allow_authenticated_read"`
