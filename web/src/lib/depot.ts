@@ -34,16 +34,6 @@ export type BucketGrantInput = {
   access: BucketAccess
 }
 
-export type FileReplica = {
-  id: string
-  file_id: string
-  storage_backend: string
-  status: "PENDING" | "ACTIVE" | "FAILED"
-  error?: string
-  created_at: string
-  updated_at: string
-}
-
 export type DepotFile = {
   id: string
   bucket_id: string
@@ -56,7 +46,6 @@ export type DepotFile = {
   public: boolean
   tags: Record<string, string> | null
   storage_backend: string
-  replicas: FileReplica[]
   created_by_entity_id: string
   created_by_client_id: string
   updated_by_entity_id: string
@@ -187,7 +176,6 @@ export type SearchResultType =
   | "file"
   | "storage_backend"
   | "bucket_grant"
-  | "file_replica"
   | "access_log"
   | "application"
   | "uploader"
@@ -386,10 +374,9 @@ function filenameFromDisposition(header: string | undefined) {
 /**
  * downloadFile streams a file through Depot rather than handing the browser a
  * presigned URL. Depot sees the transfer, so the access log records a real
- * download and a missing primary object falls back to a replica. Addressed by
- * file id alone. The response is buffered in memory, so this is the wrong
- * choice for very large objects — createDownloadURL is the direct-from-storage
- * alternative.
+ * download. Files are addressed by id alone. The response is buffered in
+ * memory, so this is the wrong choice for very large objects —
+ * createDownloadURL is the direct-from-storage alternative.
  */
 export async function downloadFile(id: string, onProgress?: (percent: number) => void) {
   const response = await api.get<Blob>(

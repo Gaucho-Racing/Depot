@@ -29,7 +29,6 @@ type File struct {
 	Tags              map[string]string `json:"tags" gorm:"type:jsonb;serializer:json"`
 	StorageBackend    string            `json:"storage_backend" gorm:"index"`
 	StorageKey        string            `json:"-"`
-	Replicas          []FileReplica     `json:"replicas" gorm:"-"`
 	CreatedByEntityID string            `json:"created_by_entity_id" gorm:"index"`
 	CreatedByClientID string            `json:"created_by_client_id" gorm:"index"`
 	UpdatedByEntityID string            `json:"updated_by_entity_id" gorm:"index"`

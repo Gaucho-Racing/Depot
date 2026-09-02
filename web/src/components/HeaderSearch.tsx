@@ -3,7 +3,6 @@ import {
   AppWindow,
   Database,
   File,
-  HardDrive,
   History,
   KeyRound,
   Package,
@@ -32,7 +31,6 @@ const resultTypeDetails: Record<SearchResultType, { label: string; icon: LucideI
   file: { label: "Files", icon: File },
   storage_backend: { label: "Storage backends", icon: Database },
   bucket_grant: { label: "Bucket grants", icon: KeyRound },
-  file_replica: { label: "File replicas", icon: HardDrive },
   access_log: { label: "Access logs", icon: History },
   application: { label: "Applications", icon: AppWindow },
   uploader: { label: "Uploaders", icon: UserRound },
@@ -157,7 +155,7 @@ export function HeaderSearch() {
         open={open}
         onOpenChange={changeOpen}
         title="Search Depot"
-        description="Find files, buckets, storage backends, grants, replicas, logs, applications, and uploaders."
+        description="Find files, buckets, storage backends, grants, logs, applications, and uploaders."
         shouldFilter={false}
         className="sm:max-w-xl"
       >

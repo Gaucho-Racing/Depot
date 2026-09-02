@@ -121,12 +121,8 @@ func DeleteStorageBackend(backend model.StorageBackend) error {
 	if err := database.DB.Model(&model.File{}).Where("storage_backend = ?", backend.Name).Count(&fileCount).Error; err != nil {
 		return err
 	}
-	var replicaCount int64
-	if err := database.DB.Model(&model.FileReplica{}).Where("storage_backend = ?", backend.Name).Count(&replicaCount).Error; err != nil {
-		return err
-	}
-	if fileCount > 0 || replicaCount > 0 {
-		return fmt.Errorf("storage backend %s still holds %d files and %d replicas", backend.Name, fileCount, replicaCount)
+	if fileCount > 0 {
+		return fmt.Errorf("storage backend %s still holds %d files", backend.Name, fileCount)
 	}
 	if err := database.DB.Delete(&backend).Error; err != nil {
 		return err

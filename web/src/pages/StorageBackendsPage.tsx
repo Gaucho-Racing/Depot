@@ -503,7 +503,7 @@ export default function StorageBackendsPage() {
                           </Button>
                         }
                         title={`Delete ${backend.name}?`}
-                        description="Backends can only be deleted when no files or replicas reference them."
+                        description="Backends can only be deleted when no buckets or files reference them."
                         confirmLabel="Delete backend"
                         isPending={deleteMutation.isPending}
                         onConfirm={async () => {
