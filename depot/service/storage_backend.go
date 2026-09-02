@@ -79,9 +79,6 @@ func CreateStorageBackend(backend model.StorageBackend) (model.StorageBackend, e
 	if err := database.DB.Create(&backend).Error; err != nil {
 		return model.StorageBackend{}, err
 	}
-	if _, err := BackfillBucketPrimaryStorageBackends(); err != nil {
-		return model.StorageBackend{}, err
-	}
 	if err := RebuildStorageBackends(); err != nil {
 		return model.StorageBackend{}, err
 	}
@@ -98,9 +95,6 @@ func UpdateStorageBackend(backend model.StorageBackend) (model.StorageBackend, e
 		}
 	}
 	if err := database.DB.Save(&backend).Error; err != nil {
-		return model.StorageBackend{}, err
-	}
-	if _, err := BackfillBucketPrimaryStorageBackends(); err != nil {
 		return model.StorageBackend{}, err
 	}
 	if err := RebuildStorageBackends(); err != nil {

@@ -77,20 +77,6 @@ func UpdateBucket(bucket model.Bucket) (model.Bucket, error) {
 	return GetBucketByID(bucket.ID)
 }
 
-func BackfillBucketPrimaryStorageBackends() (int64, error) {
-	backend, err := preferredStorageBackend()
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, nil
-		}
-		return 0, err
-	}
-	result := database.DB.Model(&model.Bucket{}).
-		Where("primary_storage_backend IS NULL OR primary_storage_backend = ''").
-		Update("primary_storage_backend", backend.Name)
-	return result.RowsAffected, result.Error
-}
-
 func CountFilesInBucket(bucketID string) (int64, error) {
 	var count int64
 	if err := database.DB.Model(&model.File{}).Where("bucket_id = ?", bucketID).Count(&count).Error; err != nil {
