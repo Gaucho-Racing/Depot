@@ -52,6 +52,15 @@ type AttributionStats struct {
 	Buckets       []BucketStats `json:"buckets"`
 }
 
+type attributionTotals struct {
+	FileCount     int64
+	TotalBytes    int64
+	BucketCount   int64
+	PublicFiles   int64
+	FirstUploadAt *time.Time
+	LastUploadAt  *time.Time
+}
+
 type ActivityPoint struct {
 	Date      string `json:"date"`
 	Uploads   int64  `json:"uploads"`
@@ -128,6 +137,7 @@ func GetAttributionStats(bucketIDs []string, filter AttributionFilter) (Attribut
 		return result.Where("created_by_client_id = ?", filter.ClientID)
 	}
 
+	totals := attributionTotals{}
 	if err := query().
 		Select(`
 			count(*) AS file_count,
@@ -137,9 +147,15 @@ func GetAttributionStats(bucketIDs []string, filter AttributionFilter) (Attribut
 			min(created_at) AS first_upload_at,
 			max(created_at) AS last_upload_at
 		`).
-		Scan(&stats).Error; err != nil {
+		Scan(&totals).Error; err != nil {
 		return AttributionStats{}, fmt.Errorf("failed to compute attribution totals: %w", err)
 	}
+	stats.FileCount = totals.FileCount
+	stats.TotalBytes = totals.TotalBytes
+	stats.BucketCount = totals.BucketCount
+	stats.PublicFiles = totals.PublicFiles
+	stats.FirstUploadAt = totals.FirstUploadAt
+	stats.LastUploadAt = totals.LastUploadAt
 
 	if err := query().
 		Select("bucket_id, bucket_name, count(*) as file_count, coalesce(sum(size_bytes), 0) as total_bytes").
