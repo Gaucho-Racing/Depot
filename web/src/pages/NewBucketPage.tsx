@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft } from "lucide-react"
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
@@ -10,8 +10,20 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { createBucket, createBucketGrant, errorMessage } from "@/lib/depot"
+import {
+  createBucket,
+  createBucketGrant,
+  errorMessage,
+  listStorageBackends,
+} from "@/lib/depot"
 
 const NAME_PATTERN = /^[a-z0-9]([a-z0-9-]{1,61}[a-z0-9])?$/
 
@@ -23,7 +35,16 @@ export default function NewBucketPage() {
   const [description, setDescription] = useState("")
   const [allowPublicFiles, setAllowPublicFiles] = useState(false)
   const [allowAuthenticatedRead, setAllowAuthenticatedRead] = useState(false)
+  const [selectedPrimaryStorageBackend, setSelectedPrimaryStorageBackend] = useState("")
   const [grants, setGrants] = useState<ApplicationAccess[]>([])
+
+  const backendsQuery = useQuery({
+    queryKey: ["storage-backends"],
+    queryFn: listStorageBackends,
+  })
+  const enabledBackends = (backendsQuery.data ?? []).filter((backend) => backend.enabled)
+  const defaultBackend = enabledBackends.find((backend) => backend.default)
+  const primaryStorageBackend = selectedPrimaryStorageBackend || defaultBackend?.name || ""
 
   const trimmedName = name.trim()
   const nameError =
@@ -36,6 +57,7 @@ export default function NewBucketPage() {
       const bucket = await createBucket({
         name: trimmedName,
         description: description.trim(),
+        primary_storage_backend: primaryStorageBackend,
         allow_public_files: allowPublicFiles,
         allow_authenticated_read: allowAuthenticatedRead,
       })
@@ -71,7 +93,13 @@ export default function NewBucketPage() {
     onError: (error) => toast.error(errorMessage(error, "Failed to create bucket")),
   })
 
-  const canSubmit = trimmedName !== "" && nameError === "" && !createMutation.isPending
+  const canSubmit =
+    trimmedName !== "" &&
+    nameError === "" &&
+    primaryStorageBackend !== "" &&
+    !backendsQuery.isLoading &&
+    !backendsQuery.isError &&
+    !createMutation.isPending
 
   return (
     <PageContainer className="max-w-3xl">
@@ -127,6 +155,48 @@ export default function NewBucketPage() {
                 rows={2}
               />
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Storage</CardTitle>
+            <CardDescription>
+              The primary backend stores every file uploaded to this bucket and cannot be changed
+              after creation.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Label>Primary storage backend</Label>
+            <Select
+              value={primaryStorageBackend}
+              onValueChange={setSelectedPrimaryStorageBackend}
+              disabled={backendsQuery.isLoading || enabledBackends.length === 0}
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    backendsQuery.isLoading ? "Loading storage backends..." : "Select a backend"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {enabledBackends.map((backend) => (
+                  <SelectItem key={backend.id} value={backend.name}>
+                    {backend.name} — {backend.bucket} ({backend.region})
+                    {backend.default ? " · Default" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {backendsQuery.isError && (
+              <p className="text-xs text-destructive">Storage backends could not be loaded.</p>
+            )}
+            {!backendsQuery.isLoading && !backendsQuery.isError && enabledBackends.length === 0 && (
+              <p className="text-xs text-destructive">
+                Create and enable a storage backend before creating a bucket.
+              </p>
+            )}
           </CardContent>
         </Card>
 

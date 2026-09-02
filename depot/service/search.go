@@ -139,13 +139,6 @@ WITH results AS (
     lower(coalesce(access::text, ''))
   FROM depot_bucket_grant
   UNION ALL
-  SELECT 'file_replica', replica.id, replica.id,
-    concat_ws(' · ', replica.status::text, replica.storage_backend, file.original_name), file.bucket_name,
-    replica.file_id, '', '',
-    lower(coalesce(replica.id, '') || ' ' || coalesce(replica.file_id, '') || ' ' || coalesce(replica.storage_backend, '') || ' ' || coalesce(replica.error, '')),
-    lower(coalesce(replica.status::text, '') || ' ' || coalesce(file.original_name, '') || ' ' || coalesce(file.bucket_name, ''))
-  FROM depot_file_replica replica JOIN depot_file file ON file.id = replica.file_id
-  UNION ALL
   SELECT 'access_log', log.id, coalesce(nullif(log.file_name, ''), log.file_id),
     concat_ws(' · ', log.action::text, log.bucket_name, nullif(log.entity_id, ''), nullif(log.client_id, '')), log.bucket_name,
     log.file_id, log.client_id, log.entity_id,
@@ -282,7 +275,7 @@ func resultFromRow(row searchRow) SearchResult {
 	switch row.Type {
 	case "bucket":
 		result.Href = "/buckets/" + url.PathEscape(row.BucketName)
-	case "file", "file_replica", "access_log":
+	case "file", "access_log":
 		result.Href = "/buckets/" + url.PathEscape(row.BucketName) + "?file=" + url.QueryEscape(row.FileID)
 	case "storage_backend":
 		result.Href = "/storage-backends"

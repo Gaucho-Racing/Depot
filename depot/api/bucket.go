@@ -11,10 +11,11 @@ import (
 )
 
 type bucketRequest struct {
-	Name                   string `json:"name"`
-	Description            string `json:"description"`
-	AllowPublicFiles       bool   `json:"allow_public_files"`
-	AllowAuthenticatedRead bool   `json:"allow_authenticated_read"`
+	Name                   string  `json:"name"`
+	Description            string  `json:"description"`
+	PrimaryStorageBackend  *string `json:"primary_storage_backend"`
+	AllowPublicFiles       bool    `json:"allow_public_files"`
+	AllowAuthenticatedRead bool    `json:"allow_authenticated_read"`
 }
 
 func ListBuckets(c *gin.Context) {
@@ -50,10 +51,15 @@ func CreateBucket(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
 		return
 	}
+	if req.PrimaryStorageBackend == nil || *req.PrimaryStorageBackend == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "primary_storage_backend is required"})
+		return
+	}
 
 	bucket := model.Bucket{
 		Name:                   req.Name,
 		Description:            req.Description,
+		PrimaryStorageBackend:  *req.PrimaryStorageBackend,
 		AllowPublicFiles:       req.AllowPublicFiles,
 		AllowAuthenticatedRead: req.AllowAuthenticatedRead,
 		CreatedByEntityID:      GetRequestTokenEntityID(c),
@@ -101,6 +107,10 @@ func UpdateBucket(c *gin.Context) {
 	var req bucketRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.PrimaryStorageBackend != nil && *req.PrimaryStorageBackend != bucket.PrimaryStorageBackend {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "primary storage backends are immutable"})
 		return
 	}
 	bucket.Description = req.Description

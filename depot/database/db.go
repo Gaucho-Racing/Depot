@@ -44,14 +44,9 @@ func Init() {
 			logger.SugarLogger.Fatalf("failed to rename depot_terminal: %v", err)
 		}
 	}
-	if db.Migrator().HasTable("depot_file_replica") && db.Migrator().HasColumn(&model.FileReplica{}, "terminal") {
-		if err := db.Migrator().RenameColumn(&model.FileReplica{}, "terminal", "storage_backend"); err != nil {
-			logger.SugarLogger.Fatalf("failed to rename depot_file_replica.terminal: %v", err)
-		}
-	}
-	if db.Migrator().HasIndex(&model.FileReplica{}, "idx_depot_file_replica_terminal") {
-		if err := db.Migrator().DropIndex(&model.FileReplica{}, "idx_depot_file_replica_terminal"); err != nil {
-			logger.SugarLogger.Errorf("failed to drop stale replica index: %v", err)
+	if db.Migrator().HasTable("depot_file_replica") {
+		if err := db.Migrator().DropTable("depot_file_replica"); err != nil {
+			logger.SugarLogger.Fatalf("failed to drop depot_file_replica: %v", err)
 		}
 	}
 
@@ -60,7 +55,6 @@ func Init() {
 		&model.File{},
 		&model.AccessLog{},
 		&model.StorageBackend{},
-		&model.FileReplica{},
 		&model.BucketGrant{},
 	); err != nil {
 		logger.SugarLogger.Fatalf("failed to run database migrations: %v", err)
@@ -71,7 +65,6 @@ func Init() {
 		`CREATE INDEX IF NOT EXISTS idx_depot_file_search ON depot_file USING GIN ((lower(coalesce(id, '') || ' ' || coalesce(bucket_name, '') || ' ' || coalesce(original_name, '') || ' ' || coalesce(path, '') || ' ' || coalesce(content_type, '') || ' ' || coalesce(storage_backend, '') || ' ' || coalesce(created_by_entity_id, '') || ' ' || coalesce(created_by_client_id, ''))) gin_trgm_ops)`,
 		`CREATE INDEX IF NOT EXISTS idx_depot_storage_backend_search ON depot_storage_backend USING GIN ((lower(coalesce(id, '') || ' ' || coalesce(name, '') || ' ' || coalesce(region, '') || ' ' || coalesce(bucket, '') || ' ' || coalesce(endpoint, ''))) gin_trgm_ops)`,
 		`CREATE INDEX IF NOT EXISTS idx_depot_bucket_grant_search ON depot_bucket_grant USING GIN ((lower(coalesce(id, '') || ' ' || coalesce(bucket_name, '') || ' ' || coalesce(client_id, '') || ' ' || coalesce(description, ''))) gin_trgm_ops)`,
-		`CREATE INDEX IF NOT EXISTS idx_depot_file_replica_search ON depot_file_replica USING GIN ((lower(coalesce(id, '') || ' ' || coalesce(file_id, '') || ' ' || coalesce(storage_backend, '') || ' ' || coalesce(error, ''))) gin_trgm_ops)`,
 		`CREATE INDEX IF NOT EXISTS idx_depot_access_log_search ON depot_access_log USING GIN ((lower(coalesce(id, '') || ' ' || coalesce(file_id, '') || ' ' || coalesce(file_name, '') || ' ' || coalesce(bucket_name, '') || ' ' || coalesce(entity_id, '') || ' ' || coalesce(client_id, ''))) gin_trgm_ops)`,
 	}
 	for _, statement := range searchIndexes {

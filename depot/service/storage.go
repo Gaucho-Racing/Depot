@@ -53,7 +53,6 @@ func InitializeStorage() {
 	}
 	logger.SugarLogger.Infof("Initialized %d storage backend(s) (%d enabled)", len(backends), enabled)
 
-	go RetryStalledReplicas()
 }
 
 func ActiveBackend() (storage.Backend, error) {

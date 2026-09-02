@@ -145,41 +145,6 @@ export function FileSheet({
                 <Row label="Updated" value={new Date(file.updated_at).toLocaleString()} />
               </div>
 
-              {(file.replicas ?? []).length > 0 && (
-                <>
-                  <Separator />
-                  <div>
-                    <p className="mb-2 text-sm font-medium">Replicas</p>
-                    <ul className="space-y-1.5">
-                      {file.replicas.map((replica) => (
-                        <li key={replica.id} className="flex items-center justify-between gap-3 text-xs">
-                          <span className="min-w-0 truncate font-mono">{replica.storage_backend}</span>
-                          <span className="flex items-center gap-2">
-                            {replica.status === "FAILED" && replica.error && (
-                              <span className="max-w-48 truncate text-muted-foreground" title={replica.error}>
-                                {replica.error}
-                              </span>
-                            )}
-                            <Badge
-                              variant={replica.status === "ACTIVE" ? "secondary" : "outline"}
-                              className={
-                                replica.status === "FAILED"
-                                  ? "border-destructive/50 text-destructive"
-                                  : replica.status === "PENDING"
-                                    ? "text-muted-foreground"
-                                    : undefined
-                              }
-                            >
-                              {replica.status}
-                            </Badge>
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </>
-              )}
-
               {file.tags && Object.keys(file.tags).length > 0 && (
                 <>
                   <Separator />

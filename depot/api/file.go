@@ -74,17 +74,6 @@ func findFileByID(c *gin.Context) (model.File, model.Bucket, bool) {
 	return file, bucket, true
 }
 
-func splitBackendNames(value string) []string {
-	names := []string{}
-	for _, part := range strings.Split(value, ",") {
-		part = strings.TrimSpace(part)
-		if part != "" {
-			names = append(names, part)
-		}
-	}
-	return names
-}
-
 func parseListParams(c *gin.Context) (limit int, offset int, ok bool) {
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "100"))
 	if err != nil || limit < 1 || limit > 1000 {
@@ -292,7 +281,7 @@ func UploadFile(c *gin.Context) {
 		}
 	}
 
-	created, err := service.UploadFile(c.Request.Context(), bucket, file, reader, c.PostForm("storage_backend"), splitBackendNames(c.PostForm("replicas")))
+	created, err := service.UploadFile(c.Request.Context(), bucket, file, reader, c.PostForm("storage_backend"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -406,7 +395,6 @@ func InitiateUpload(c *gin.Context) {
 		Public         bool              `json:"public"`
 		Tags           map[string]string `json:"tags"`
 		StorageBackend string            `json:"storage_backend"`
-		Replicas       []string          `json:"replicas"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -428,7 +416,7 @@ func InitiateUpload(c *gin.Context) {
 		UpdatedByEntityID: GetRequestTokenEntityID(c),
 		UpdatedByClientID: GetRequestTokenClientID(c),
 	}
-	created, request, err := service.InitiateUpload(c.Request.Context(), bucket, file, req.StorageBackend, req.Replicas)
+	created, request, err := service.InitiateUpload(c.Request.Context(), bucket, file, req.StorageBackend)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
