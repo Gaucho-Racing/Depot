@@ -17,10 +17,7 @@ func InitializeStorage() {
 	if err := database.DB.Model(&model.StorageBackend{}).Count(&count).Error; err != nil {
 		logger.SugarLogger.Fatalf("failed to count storage backends: %v", err)
 	}
-	if count == 0 {
-		if config.StorageBackend != "s3" || config.S3Bucket == "" {
-			logger.SugarLogger.Fatalf("no storage backends configured and no seedable env config found")
-		}
+	if count == 0 && config.StorageBackend == "s3" && config.S3Bucket != "" {
 		provider := model.StorageProviderAWSS3
 		if config.S3Endpoint != "" {
 			provider = model.StorageProviderS3Compatible

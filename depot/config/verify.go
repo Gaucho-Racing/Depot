@@ -52,10 +52,7 @@ func Verify() {
 		StorageBackend = "s3"
 		logger.SugarLogger.Infof("STORAGE_BACKEND is not set, defaulting to %s", StorageBackend)
 	}
-	if StorageBackend == "s3" {
-		if S3Bucket == "" {
-			logger.SugarLogger.Fatal("S3_BUCKET is required")
-		}
+	if StorageBackend == "s3" && S3Bucket != "" {
 		if S3Region == "" {
 			S3Region = "us-west-2"
 			logger.SugarLogger.Infof("S3_REGION is not set, defaulting to %s", S3Region)
