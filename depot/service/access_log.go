@@ -15,18 +15,20 @@ type Actor struct {
 	Type     model.ActorType
 }
 
-func RecordAccess(file model.File, action model.AccessAction, actor Actor) {
+func RecordAccess(file model.File, action model.AccessAction, actor Actor, bytesTransferred int64) {
 	log := model.AccessLog{
-		ID:         ulid.Make().Prefixed("acc"),
-		FileID:     file.ID,
-		FileName:   file.OriginalName,
-		BucketID:   file.BucketID,
-		BucketName: file.BucketName,
-		Action:     action,
-		EntityID:   actor.EntityID,
-		ClientID:   actor.ClientID,
-		ActorType:  actor.Type,
-		Public:     actor.Type == model.ActorTypeAnonymous,
+		ID:               ulid.Make().Prefixed("acc"),
+		FileID:           file.ID,
+		FileName:         file.OriginalName,
+		BucketID:         file.BucketID,
+		BucketName:       file.BucketName,
+		StorageBackend:   file.StorageBackend,
+		Action:           action,
+		BytesTransferred: bytesTransferred,
+		EntityID:         actor.EntityID,
+		ClientID:         actor.ClientID,
+		ActorType:        actor.Type,
+		Public:           actor.Type == model.ActorTypeAnonymous,
 	}
 	if err := database.DB.Create(&log).Error; err != nil {
 		logger.SugarLogger.Errorf("failed to record access log for %s: %v", file.ID, err)

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { Boxes, Files, HardDrive } from "lucide-react"
+import { ArrowDownToLine, ArrowRight, ArrowUpFromLine, Boxes, CircleDollarSign, Files, HardDrive } from "lucide-react"
 import { Link } from "react-router-dom"
 import {
   Area,
@@ -14,9 +14,10 @@ import {
 import { ApplicationDisplay } from "@/components/ApplicationDisplay"
 import { IdentityDisplay } from "@/components/IdentityDisplay"
 import { PageContainer, PageHeader } from "@/components/PageContainer"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { formatBytes, getActivity, getStats } from "@/lib/depot"
+import { formatBytes, formatUSD, getActivity, getStats, getTransferAnalytics } from "@/lib/depot"
 import { useApplicationDirectory, useIdentityDirectory } from "@/lib/directory"
 
 function StatTile({
@@ -49,9 +50,21 @@ function StatTile({
   )
 }
 
+function formatTrackingDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value))
+}
+
 export default function DashboardPage() {
   const statsQuery = useQuery({ queryKey: ["stats"], queryFn: getStats })
   const activityQuery = useQuery({ queryKey: ["activity", 30], queryFn: () => getActivity(30) })
+  const transfersQuery = useQuery({
+    queryKey: ["transfer-analytics", 30],
+    queryFn: () => getTransferAnalytics(30),
+  })
 
   const stats = statsQuery.data
   const identityDirectory = useIdentityDirectory(
@@ -61,6 +74,8 @@ export default function DashboardPage() {
     (stats?.top_applications ?? []).map((application) => application.client_id),
   )
   const maxBucketBytes = Math.max(1, ...(stats?.buckets ?? []).map((b) => b.total_bytes))
+  const transfers = transfersQuery.data
+  const costEstimate = transfers?.cost_estimate
 
   return (
     <PageContainer>
@@ -88,6 +103,157 @@ export default function DashboardPage() {
           icon={Boxes}
           loading={statsQuery.isLoading}
         />
+      </div>
+
+      <div className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
+        <Card>
+          <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle>Transfer volume</CardTitle>
+              <CardDescription>
+                {transfers?.tracking_started_at
+                  ? `Measured since ${formatTrackingDate(transfers.tracking_started_at)}.`
+                  : "Byte tracking starts with the next transfer."}
+              </CardDescription>
+            </div>
+            {!transfersQuery.isLoading && transfers ? (
+              <div className="flex shrink-0 flex-wrap gap-3 text-xs">
+                <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                  <ArrowUpFromLine className="size-3.5 text-[var(--chart-1)]" />
+                  {formatBytes(transfers.totals.upload_bytes)} uploaded
+                </span>
+                <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                  <ArrowDownToLine className="size-3.5 text-[var(--chart-2)]" />
+                  {formatBytes(transfers.totals.download_bytes)} downloaded
+                </span>
+              </div>
+            ) : null}
+          </CardHeader>
+          <CardContent>
+            {transfersQuery.isLoading ? (
+              <Skeleton className="h-64 w-full rounded-lg" />
+            ) : transfersQuery.isError ? (
+              <p className="flex h-64 items-center justify-center text-sm text-muted-foreground">
+                Transfer analytics are unavailable.
+              </p>
+            ) :
+              (transfers?.totals.upload_bytes ?? 0) === 0 &&
+              (transfers?.totals.download_bytes ?? 0) === 0 ? (
+              <p className="flex h-64 items-center justify-center text-sm text-muted-foreground">
+                No measured transfer bytes yet.
+              </p>
+            ) : (
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={transfers?.daily ?? []} margin={{ left: 8, right: 8, top: 8 }}>
+                    <defs>
+                      <linearGradient id="fill-upload-bytes" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.55} />
+                        <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0.03} />
+                      </linearGradient>
+                      <linearGradient id="fill-download-bytes" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--chart-2)" stopOpacity={0.55} />
+                        <stop offset="95%" stopColor="var(--chart-2)" stopOpacity={0.03} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="var(--border)" vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                      tickFormatter={(value: string) => value.slice(5)}
+                    />
+                    <YAxis
+                      width={68}
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                      tickFormatter={(value: number) => formatBytes(value)}
+                    />
+                    <Tooltip
+                      formatter={(value) => formatBytes(Number(value ?? 0))}
+                      contentStyle={{
+                        background: "var(--popover)",
+                        border: "1px solid var(--border)",
+                        borderRadius: "0.5rem",
+                        color: "var(--popover-foreground)",
+                        fontSize: 12,
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="upload_bytes"
+                      name="Uploaded"
+                      stroke="var(--chart-1)"
+                      fill="url(#fill-upload-bytes)"
+                      strokeWidth={2}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="download_bytes"
+                      name="Downloaded"
+                      stroke="var(--chart-2)"
+                      fill="url(#fill-download-bytes)"
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+            {!transfersQuery.isLoading && transfers && transfers.totals.download_failures > 0 ? (
+              <p className="mt-3 text-xs text-destructive">
+                {transfers.totals.download_failures} failed download
+                {transfers.totals.download_failures === 1 ? "" : "s"} excluded from downloaded bytes.
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CircleDollarSign className="size-5 text-gr-purple" />
+              Estimated cost
+            </CardTitle>
+            <CardDescription>Projected monthly storage and request costs.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-1 flex-col items-start">
+            {transfersQuery.isLoading ? (
+              <div className="w-full space-y-4">
+                <Skeleton className="h-10 w-32" />
+                <Skeleton className="h-8 w-40" />
+              </div>
+            ) : transfersQuery.isError || !costEstimate ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                Cost estimates are unavailable.
+              </p>
+            ) : costEstimate.priced_backend_count === 0 && costEstimate.unpriced_backend_count > 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                No priced storage backends are in this view.
+              </p>
+            ) : (
+              <>
+                <p className="text-3xl font-semibold tabular-nums tracking-tight">
+                  {formatUSD(costEstimate.estimated_monthly_usd)}
+                  <span className="ml-1 text-sm font-normal text-muted-foreground">/ month</span>
+                </p>
+                {costEstimate.unpriced_backend_count > 0 ? (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    {costEstimate.unpriced_backend_count} backend
+                    {costEstimate.unpriced_backend_count === 1 ? " is" : "s are"} not included.
+                  </p>
+                ) : null}
+              </>
+            )}
+            <Button asChild variant="outline" className="mt-auto">
+              <Link to="/cost-explorer">
+                View cost explorer
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
 
       <Card className="mb-6">

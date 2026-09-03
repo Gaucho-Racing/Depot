@@ -24,17 +24,19 @@ const (
 )
 
 type AccessLog struct {
-	ID         string       `json:"id" gorm:"primaryKey"`
-	FileID     string       `json:"file_id" gorm:"index"`
-	FileName   string       `json:"file_name"`
-	BucketID   string       `json:"bucket_id" gorm:"index"`
-	BucketName string       `json:"bucket_name" gorm:"index"`
-	Action     AccessAction `json:"action" gorm:"index"`
-	EntityID   string       `json:"entity_id" gorm:"index"`
-	ClientID   string       `json:"client_id" gorm:"index"`
-	ActorType  ActorType    `json:"actor_type" gorm:"index"`
-	Public     bool         `json:"public"`
-	CreatedAt  time.Time    `json:"created_at" gorm:"autoCreateTime;index"`
+	ID               string       `json:"id" gorm:"primaryKey"`
+	FileID           string       `json:"file_id" gorm:"index"`
+	FileName         string       `json:"file_name"`
+	BucketID         string       `json:"bucket_id" gorm:"index"`
+	BucketName       string       `json:"bucket_name" gorm:"index"`
+	StorageBackend   string       `json:"storage_backend" gorm:"index"`
+	Action           AccessAction `json:"action" gorm:"index"`
+	BytesTransferred int64        `json:"bytes_transferred"`
+	EntityID         string       `json:"entity_id" gorm:"index"`
+	ClientID         string       `json:"client_id" gorm:"index"`
+	ActorType        ActorType    `json:"actor_type" gorm:"index"`
+	Public           bool         `json:"public"`
+	CreatedAt        time.Time    `json:"created_at" gorm:"autoCreateTime;index"`
 }
 
 func (AccessLog) TableName() string {

@@ -57,6 +57,7 @@ func InitializeRoutes(router *gin.Engine) {
 
 	router.GET("/stats", GetStats)
 	router.GET("/stats/activity", GetActivityStats)
+	router.GET("/stats/transfers", GetTransferAnalytics)
 	router.GET("/search", OmniSearch)
 	router.GET("/stats/uploaders/:entityID", GetUploaderStats)
 	router.GET("/stats/applications/:clientID", GetApplicationStats)

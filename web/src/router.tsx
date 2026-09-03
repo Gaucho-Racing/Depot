@@ -5,6 +5,7 @@ import { RequireAuth } from "@/components/RequireAuth"
 import AttributionDetailsPage from "@/pages/AttributionDetailsPage"
 import BucketDetailsPage from "@/pages/BucketDetailsPage"
 import BucketsPage from "@/pages/BucketsPage"
+import CostExplorerPage from "@/pages/CostExplorerPage"
 import EditBucketPage from "@/pages/EditBucketPage"
 import DashboardPage from "@/pages/DashboardPage"
 import LoginPage from "@/pages/LoginPage"
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
         children: [
           { path: "/", element: <Navigate to="/dashboard" replace /> },
           { path: "/dashboard", element: <DashboardPage /> },
+          { path: "/cost-explorer", element: <CostExplorerPage /> },
           { path: "/uploaders/:entityID", element: <AttributionDetailsPage kind="uploader" /> },
           {
             path: "/applications/:clientID",

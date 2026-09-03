@@ -60,6 +60,27 @@ func GetActivityStats(c *gin.Context) {
 	c.JSON(http.StatusOK, points)
 }
 
+func GetTransferAnalytics(c *gin.Context) {
+	Require(c, RequestTokenExists(c))
+
+	days, err := strconv.Atoi(c.DefaultQuery("days", "30"))
+	if err != nil || days < 1 || days > 365 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "days must be an integer between 1 and 365"})
+		return
+	}
+	bucketIDs, err := accessibleBucketIDs(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	analytics, err := service.GetTransferAnalytics(bucketIDs, days)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, analytics)
+}
+
 func GetUploaderStats(c *gin.Context) {
 	getAttributionStats(c, service.AttributionFilter{EntityID: strings.TrimSpace(c.Param("entityID"))})
 }
