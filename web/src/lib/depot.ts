@@ -99,6 +99,8 @@ export type AccessLog = {
   file_name: string
   bucket_id: string
   bucket_name: string
+  storage_backend: string
+  bytes_transferred: number
   action:
     | "UPLOAD"
     | "PRESIGN_UPLOAD"
@@ -161,6 +163,64 @@ export type ActivityPoint = {
   uploads: number
   downloads: number
   deletes: number
+}
+
+export type TransferPoint = {
+  date: string
+  uploads: number
+  downloads: number
+  download_failures: number
+  upload_bytes: number
+  download_bytes: number
+}
+
+export type TransferTotals = {
+  uploads: number
+  downloads: number
+  download_failures: number
+  upload_bytes: number
+  download_bytes: number
+}
+
+export type BackendCostEstimate = {
+  storage_backend: string
+  provider: StorageProvider | ""
+  region: string
+  file_count: number
+  stored_bytes: number
+  uploads: number
+  downloads: number
+  upload_bytes: number
+  download_bytes: number
+  monthly_storage_usd: number
+  period_request_usd: number
+  monthly_request_run_rate_usd: number
+  estimated_monthly_usd: number
+  priced: boolean
+}
+
+export type CostEstimate = {
+  currency: "USD"
+  pricing_as_of: string
+  pricing_source: string
+  monthly_storage_usd: number
+  period_request_usd: number
+  monthly_request_run_rate_usd: number
+  estimated_monthly_usd: number
+  priced_backend_count: number
+  unpriced_backend_count: number
+  network_transfer_included: boolean
+  backends: BackendCostEstimate[]
+}
+
+export type TransferAnalytics = {
+  days: number
+  from: string
+  through: string
+  tracking_started_at?: string
+  totals: TransferTotals
+  daily: TransferPoint[]
+  cost_estimate: CostEstimate
 }
 
 export type SentinelApplication = {
@@ -444,6 +504,11 @@ export async function getAttributionStats(
 
 export async function getActivity(days = 30) {
   const response = await api.get<ActivityPoint[]>("/stats/activity", { params: { days } })
+  return response.data
+}
+
+export async function getTransferAnalytics(days = 30) {
+  const response = await api.get<TransferAnalytics>("/stats/transfers", { params: { days } })
   return response.data
 }
 

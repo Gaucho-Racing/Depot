@@ -288,7 +288,7 @@ func UploadFile(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	service.RecordAccess(created, model.AccessActionUpload, requestActor(c))
+	service.RecordAccess(created, model.AccessActionUpload, requestActor(c), created.SizeBytes)
 	c.JSON(http.StatusCreated, created)
 }
 
@@ -355,11 +355,11 @@ func DownloadFile(c *gin.Context) {
 	actor := requestActor(c)
 	written, err := streamFile(c, file, fmt.Sprintf("attachment; filename=%q", file.DownloadName()))
 	if err != nil {
-		service.RecordAccess(file, model.AccessActionDownloadFailed, actor)
+		service.RecordAccess(file, model.AccessActionDownloadFailed, actor, written)
 		handleFileStreamError(c, file, written, err)
 		return
 	}
-	service.RecordAccess(file, model.AccessActionDownload, actor)
+	service.RecordAccess(file, model.AccessActionDownload, actor, written)
 }
 
 func CreateDownloadURL(c *gin.Context) {
@@ -425,11 +425,11 @@ func downloadFileWithToken(c *gin.Context, fileID string, tokenID string) {
 
 	written, err := streamFile(c, file, fmt.Sprintf("inline; filename=%q", file.DownloadName()))
 	if err != nil {
-		service.RecordAccess(file, model.AccessActionDownloadFailed, actor)
+		service.RecordAccess(file, model.AccessActionDownloadFailed, actor, written)
 		handleFileStreamError(c, file, written, err)
 		return
 	}
-	service.RecordAccess(file, model.AccessActionDownload, actor)
+	service.RecordAccess(file, model.AccessActionDownload, actor, written)
 }
 
 func streamFile(c *gin.Context, file model.File, contentDisposition string) (int64, error) {
@@ -539,6 +539,6 @@ func CompleteUpload(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	service.RecordAccess(completed, model.AccessActionPresignUpload, requestActor(c))
+	service.RecordAccess(completed, model.AccessActionPresignUpload, requestActor(c), completed.SizeBytes)
 	c.JSON(http.StatusOK, completed)
 }
