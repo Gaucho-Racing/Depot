@@ -48,6 +48,9 @@ func CreateBucket(bucket model.Bucket) (model.Bucket, error) {
 	if err := ValidateBucketName(bucket.Name); err != nil {
 		return model.Bucket{}, err
 	}
+	if bucket.AllowAuthenticatedWrite {
+		bucket.AllowAuthenticatedRead = true
+	}
 	backend, err := GetStorageBackendByName(bucket.PrimaryStorageBackend)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -66,10 +69,14 @@ func CreateBucket(bucket model.Bucket) (model.Bucket, error) {
 }
 
 func UpdateBucket(bucket model.Bucket) (model.Bucket, error) {
+	if bucket.AllowAuthenticatedWrite {
+		bucket.AllowAuthenticatedRead = true
+	}
 	if err := database.DB.Model(&bucket).Select(
 		"description",
 		"allow_public_files",
 		"allow_authenticated_read",
+		"allow_authenticated_write",
 		"updated_by_entity_id",
 	).Updates(bucket).Error; err != nil {
 		return model.Bucket{}, err

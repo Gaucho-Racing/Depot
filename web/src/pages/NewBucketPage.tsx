@@ -35,6 +35,7 @@ export default function NewBucketPage() {
   const [description, setDescription] = useState("")
   const [allowPublicFiles, setAllowPublicFiles] = useState(false)
   const [allowAuthenticatedRead, setAllowAuthenticatedRead] = useState(false)
+  const [allowAuthenticatedWrite, setAllowAuthenticatedWrite] = useState(false)
   const [selectedPrimaryStorageBackend, setSelectedPrimaryStorageBackend] = useState("")
   const [grants, setGrants] = useState<ApplicationAccess[]>([])
 
@@ -60,6 +61,7 @@ export default function NewBucketPage() {
         primary_storage_backend: primaryStorageBackend,
         allow_public_files: allowPublicFiles,
         allow_authenticated_read: allowAuthenticatedRead,
+        allow_authenticated_write: allowAuthenticatedWrite,
       })
 
       // The bucket has to exist before its grants can reference it, so a grant
@@ -204,8 +206,8 @@ export default function NewBucketPage() {
           <CardHeader>
             <CardTitle>Application access</CardTitle>
             <CardDescription>
-              Which applications may read or write files here. Depot admins always have access;
-              everything else needs a grant. You can change this any time.
+              Choose broad authenticated access or grant individual applications access. Depot
+              admins always have access. You can change this any time.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -213,14 +215,33 @@ export default function NewBucketPage() {
               <input
                 type="checkbox"
                 checked={allowAuthenticatedRead}
-                onChange={(event) => setAllowAuthenticatedRead(event.target.checked)}
+                onChange={(event) => {
+                  setAllowAuthenticatedRead(event.target.checked)
+                  if (!event.target.checked) setAllowAuthenticatedWrite(false)
+                }}
                 className="mt-0.5 size-4 accent-(--color-gr-purple)"
               />
               <span>
-                Readable by any authenticated application
+                Readable by any authenticated user or application
                 <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Any caller with a valid Sentinel token can download from this bucket. Uploads
-                  still need a write grant below.
+                  Any caller with a valid Sentinel token can download from this bucket.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={allowAuthenticatedWrite}
+                onChange={(event) => {
+                  setAllowAuthenticatedWrite(event.target.checked)
+                  if (event.target.checked) setAllowAuthenticatedRead(true)
+                }}
+                className="mt-0.5 size-4 accent-(--color-gr-purple)"
+              />
+              <span>
+                Writable by any authenticated user or application
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Any caller with a valid Sentinel token can upload and download files.
                 </span>
               </span>
             </label>
@@ -228,6 +249,7 @@ export default function NewBucketPage() {
               value={grants}
               onChange={setGrants}
               readIsRedundant={allowAuthenticatedRead}
+              writeIsRedundant={allowAuthenticatedWrite}
             />
           </CardContent>
         </Card>

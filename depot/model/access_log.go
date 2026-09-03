@@ -8,6 +8,7 @@ const (
 	AccessActionUpload          AccessAction = "UPLOAD"
 	AccessActionPresignUpload   AccessAction = "PRESIGN_UPLOAD"
 	AccessActionDownload        AccessAction = "DOWNLOAD"
+	AccessActionDownloadFailed  AccessAction = "DOWNLOAD_FAILED"
 	AccessActionPresignDownload AccessAction = "PRESIGN_DOWNLOAD"
 	AccessActionDelete          AccessAction = "DELETE"
 )

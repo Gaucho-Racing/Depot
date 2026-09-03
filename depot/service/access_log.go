@@ -28,11 +28,9 @@ func RecordAccess(file model.File, action model.AccessAction, actor Actor) {
 		ActorType:  actor.Type,
 		Public:     actor.Type == model.ActorTypeAnonymous,
 	}
-	go func() {
-		if err := database.DB.Create(&log).Error; err != nil {
-			logger.SugarLogger.Errorf("failed to record access log for %s: %v", file.ID, err)
-		}
-	}()
+	if err := database.DB.Create(&log).Error; err != nil {
+		logger.SugarLogger.Errorf("failed to record access log for %s: %v", file.ID, err)
+	}
 }
 
 func ListFileAccessLogs(fileID string, limit int) ([]model.AccessLog, error) {

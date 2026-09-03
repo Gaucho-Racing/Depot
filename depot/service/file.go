@@ -201,11 +201,3 @@ func OpenFile(ctx context.Context, file model.File) (io.ReadCloser, error) {
 	}
 	return body, nil
 }
-
-func PresignDownload(ctx context.Context, file model.File) (storage.PresignedRequest, error) {
-	backend, err := storage.GetBackend(file.StorageBackend)
-	if err != nil {
-		return storage.PresignedRequest{}, err
-	}
-	return backend.PresignGet(ctx, file.StorageKey, file.DownloadName(), expiryDuration())
-}

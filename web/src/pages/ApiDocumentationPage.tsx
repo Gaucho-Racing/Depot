@@ -59,7 +59,8 @@ const endpointGroups: EndpointGroup[] = [
       { method: "GET", path: "/buckets/:bucketName/files", summary: "List and filter files in a bucket.", access: "READ grant" },
       { method: "POST", path: "/buckets/:bucketName/files", summary: "Upload a file as multipart form data.", access: "WRITE grant" },
       { method: "GET", path: "/buckets/:bucketName/files/:id", summary: "Get metadata for one file.", access: "Public or READ" },
-      { method: "POST", path: "/buckets/:bucketName/files/:id/download-url", summary: "Create a temporary direct-download URL.", access: "Public or READ" },
+      { method: "POST", path: "/buckets/:bucketName/files/:id/download-url", summary: "Create a one-hour Depot download URL.", access: "Bearer; public or READ" },
+      { method: "GET", path: "/download/:fileID?token=:token", summary: "Stream a file using a valid download token.", access: "Download token" },
       { method: "POST", path: "/buckets/:bucketName/uploads", summary: "Start a direct-to-storage upload.", access: "WRITE grant" },
       { method: "POST", path: "/buckets/:bucketName/uploads/:id/complete", summary: "Verify and activate a direct upload.", access: "WRITE grant" },
     ],
@@ -237,6 +238,39 @@ UPLOAD=$(curl --fail-with-body --request POST \\
 # 2. PUT the bytes to upload_url using the returned method
 # 3. Confirm with POST /buckets/media/uploads/{file.id}/complete`
 
+const browserDeliveryCode = `type DepotDownload = {
+  url: string
+  path: string
+  method: "GET"
+  expires_at: string
+}
+
+export async function createDepotDownload(fileID: string): Promise<DepotDownload> {
+  const depotBaseUrl = process.env.DEPOT_BASE_URL
+  const depotToken = process.env.DEPOT_ACCESS_TOKEN
+  if (!depotBaseUrl || !depotToken) {
+    throw new Error("Depot configuration is missing")
+  }
+
+  const response = await fetch(
+    \`${"${depotBaseUrl}"}/buckets/media/files/${"${encodeURIComponent(fileID)}"}/download-url\`,
+    {
+      method: "POST",
+      headers: { Authorization: \`Bearer ${"${depotToken}"}\` },
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(\`Depot URL request failed: ${"${response.status}"}\`)
+  }
+
+  return response.json()
+}
+
+// Send download.url to the client through your application's API.
+// The client can then use it without a Sentinel token:
+// <img src={download.url} alt="Vehicle" />`
+
 function CopyButton({ value, label = "Copy" }: { value: string; label?: string }) {
   const [copied, setCopied] = useState(false)
 
@@ -396,8 +430,8 @@ export default function ApiDocumentationPage() {
           </Badge>
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Build with Depot</h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">
-            Store, organize, and deliver application files through one authenticated API. Start with a
-            Sentinel service account, grant it access to a bucket, and use the same bearer token for every request.
+            Store, organize, and deliver application files through one API. Start with a Sentinel
+            service account, grant it access to a bucket, and keep its bearer token in your backend.
           </p>
           <div className="mt-6 flex flex-col gap-2 rounded-lg border border-border/60 bg-background/80 p-3 sm:flex-row sm:items-center">
             <span className="shrink-0 text-xs font-medium text-muted-foreground">Base URL</span>
@@ -426,7 +460,7 @@ export default function ApiDocumentationPage() {
                   Ask a Depot admin for <strong className="font-medium text-foreground">READ</strong> access to consume files or <strong className="font-medium text-foreground">WRITE</strong> access to upload and read. WRITE includes READ.
                 </SetupStep>
                 <SetupStep number="4" title="Send the bearer token">
-                  Set <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">Authorization: Bearer &lt;token&gt;</code> on each request. Keep service-account tokens on the server and rotate them from Sentinel.
+                  Set <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">Authorization: Bearer &lt;token&gt;</code> on authenticated API requests. Keep service-account tokens on the server and rotate them from Sentinel. Token-backed download URLs are the exception and can be sent to browser clients.
                 </SetupStep>
               </CardContent>
             </Card>
@@ -467,6 +501,41 @@ export default function ApiDocumentationPage() {
                   </div>
                 </div>
                 <CodeBlock code={presignedCode} language="bash" />
+              </CardContent>
+            </Card>
+          </section>
+
+          <section id="browser-delivery" className="scroll-mt-24">
+            <Card className="border-primary/15">
+              <CardHeader>
+                <CardTitle>Display files in browser clients</CardTitle>
+                <CardDescription>
+                  Generate the temporary URL in your application backend, then send it to the client.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(360px,1fr)] lg:items-start">
+                <div className="space-y-3 text-sm leading-6 text-muted-foreground">
+                  <p>
+                    Your backend calls the download URL endpoint with its Sentinel bearer token.
+                    Depot creates a <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">dlt_…</code> token
+                    that expires after one hour and returns a URL suitable for an image, video, link, or other browser-native request.
+                  </p>
+                  <p>
+                    Send only the returned URL to the browser. Do not put the Sentinel token in browser code,
+                    an element attribute, or a URL. The download URL is itself a temporary bearer credential,
+                    so avoid persisting, logging, or sharing it beyond the intended client.
+                  </p>
+                  <p>
+                    Depot attributes each completed transfer to the entity and application that created the URL.
+                    Successful transfers count as downloads; interrupted or failed transfers are recorded as failures
+                    and excluded from download metrics. A browser-cache hit does not count because it does not transfer bytes from Depot.
+                  </p>
+                  <div className="flex items-start gap-2 rounded-lg bg-muted/60 p-3 text-foreground">
+                    <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />
+                    A URL may be reused until it expires. Generate a new one when it is missing or nearing expiration.
+                  </div>
+                </div>
+                <CodeBlock code={browserDeliveryCode} language="typescript" />
               </CardContent>
             </Card>
           </section>
@@ -517,6 +586,7 @@ export default function ApiDocumentationPage() {
                   ["getting-started", "Get connected"],
                   ["quick-start", "Quick start"],
                   ["large-files", "Large files"],
+                  ["browser-delivery", "Browser delivery"],
                   ["endpoints", "Endpoint reference"],
                 ].map(([id, label]) => (
                   <a key={id} href={`#${id}`} className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
