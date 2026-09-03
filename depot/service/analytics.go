@@ -54,6 +54,35 @@ type BackendCostEstimate struct {
 	Priced                   bool                  `json:"priced"`
 }
 
+type BucketCostEstimate struct {
+	BucketID                 string                `json:"bucket_id"`
+	BucketName               string                `json:"bucket_name"`
+	StorageBackend           string                `json:"storage_backend"`
+	Provider                 model.StorageProvider `json:"provider"`
+	Region                   string                `json:"region"`
+	FileCount                int64                 `json:"file_count"`
+	StoredBytes              int64                 `json:"stored_bytes"`
+	Uploads                  int64                 `json:"uploads"`
+	Downloads                int64                 `json:"downloads"`
+	UploadBytes              int64                 `json:"upload_bytes"`
+	DownloadBytes            int64                 `json:"download_bytes"`
+	MonthlyStorageUSD        float64               `json:"monthly_storage_usd"`
+	PeriodRequestUSD         float64               `json:"period_request_usd"`
+	MonthlyRequestRunRateUSD float64               `json:"monthly_request_run_rate_usd"`
+	EstimatedMonthlyUSD      float64               `json:"estimated_monthly_usd"`
+	Priced                   bool                  `json:"priced"`
+}
+
+type CostPoint struct {
+	Date                     string  `json:"date"`
+	MonthlyStorageUSD        float64 `json:"monthly_storage_usd"`
+	MonthlyRequestRunRateUSD float64 `json:"monthly_request_run_rate_usd"`
+	EstimatedMonthlyUSD      float64 `json:"estimated_monthly_usd"`
+	UploadRequestUSD         float64 `json:"upload_request_usd"`
+	DownloadRequestUSD       float64 `json:"download_request_usd"`
+	DailyRequestUSD          float64 `json:"daily_request_usd"`
+}
+
 type CostEstimate struct {
 	Currency                 string                `json:"currency"`
 	PricingAsOf              string                `json:"pricing_as_of"`
@@ -66,6 +95,8 @@ type CostEstimate struct {
 	UnpricedBackendCount     int                   `json:"unpriced_backend_count"`
 	NetworkTransferIncluded  bool                  `json:"network_transfer_included"`
 	Backends                 []BackendCostEstimate `json:"backends"`
+	Buckets                  []BucketCostEstimate  `json:"buckets"`
+	Daily                    []CostPoint           `json:"daily"`
 }
 
 type TransferAnalytics struct {
@@ -98,6 +129,41 @@ type backendTransferRow struct {
 	Bytes          int64
 }
 
+type bucketUsageRow struct {
+	BucketID       string
+	BucketName     string
+	StorageBackend string
+	FileCount      int64
+	StoredBytes    int64
+}
+
+type bucketTransferRow struct {
+	BucketID       string
+	BucketName     string
+	StorageBackend string
+	Action         model.AccessAction
+	Count          int64
+	Bytes          int64
+}
+
+type bucketBackendKey struct {
+	BucketID       string
+	StorageBackend string
+}
+
+type dailyStorageRow struct {
+	Day            time.Time
+	StorageBackend string
+	Bytes          int64
+}
+
+type dailyRequestRow struct {
+	Day            time.Time
+	StorageBackend string
+	Action         model.AccessAction
+	Count          int64
+}
+
 func GetTransferAnalytics(bucketIDs []string, days int) (TransferAnalytics, error) {
 	now := time.Now().UTC()
 	through := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
@@ -113,6 +179,8 @@ func GetTransferAnalytics(bucketIDs []string, days int) (TransferAnalytics, erro
 			PricingSource:           "https://aws.amazon.com/s3/pricing/",
 			NetworkTransferIncluded: false,
 			Backends:                []BackendCostEstimate{},
+			Buckets:                 []BucketCostEstimate{},
+			Daily:                   []CostPoint{},
 		},
 	}
 
@@ -190,6 +258,8 @@ func getCostEstimate(bucketIDs []string, from time.Time, until time.Time, days i
 		PricingSource:           "https://aws.amazon.com/s3/pricing/",
 		NetworkTransferIncluded: false,
 		Backends:                []BackendCostEstimate{},
+		Buckets:                 []BucketCostEstimate{},
+		Daily:                   []CostPoint{},
 	}
 
 	usageRows := []backendUsageRow{}
@@ -212,6 +282,28 @@ func getCostEstimate(bucketIDs []string, from time.Time, until time.Time, days i
 		Group("storage_backend, action").
 		Scan(&transferRows).Error; err != nil {
 		return CostEstimate{}, fmt.Errorf("failed to compute backend transfer usage: %w", err)
+	}
+
+	bucketUsageRows := []bucketUsageRow{}
+	if err := database.DB.Model(&model.File{}).
+		Where("status = ? AND bucket_id IN ? AND storage_backend != ''", model.FileStatusActive, bucketIDs).
+		Select("bucket_id, bucket_name, storage_backend, count(*) AS file_count, coalesce(sum(size_bytes), 0) AS stored_bytes").
+		Group("bucket_id, bucket_name, storage_backend").
+		Scan(&bucketUsageRows).Error; err != nil {
+		return CostEstimate{}, fmt.Errorf("failed to compute bucket storage usage: %w", err)
+	}
+
+	bucketTransferRows := []bucketTransferRow{}
+	if err := database.DB.Model(&model.AccessLog{}).
+		Where("bucket_id IN ? AND storage_backend != '' AND created_at >= ? AND created_at < ? AND action IN ?", bucketIDs, from, until, []model.AccessAction{
+			model.AccessActionUpload,
+			model.AccessActionPresignUpload,
+			model.AccessActionDownload,
+		}).
+		Select("bucket_id, bucket_name, storage_backend, action, count(*) AS count, coalesce(sum(bytes_transferred), 0) AS bytes").
+		Group("bucket_id, bucket_name, storage_backend, action").
+		Scan(&bucketTransferRows).Error; err != nil {
+		return CostEstimate{}, fmt.Errorf("failed to compute bucket transfer usage: %w", err)
 	}
 
 	backends, err := ListStorageBackends()
@@ -258,12 +350,8 @@ func getCostEstimate(bucketIDs []string, from time.Time, until time.Time, days i
 			backendEstimate.Provider = backend.Provider
 			backendEstimate.Region = backend.Region
 		}
-		backendEstimate.Priced = supportsAWSS3StandardPricing(backendEstimate.Provider, backendEstimate.Region)
+		priceBackendEstimate(backendEstimate, days)
 		if backendEstimate.Priced {
-			backendEstimate.MonthlyStorageUSD = awsS3StandardStorageCost(backendEstimate.StoredBytes)
-			backendEstimate.PeriodRequestUSD = float64(backendEstimate.Uploads)*awsS3PutRequestRate + float64(backendEstimate.Downloads)*awsS3GetRequestRate
-			backendEstimate.MonthlyRequestRunRateUSD = backendEstimate.PeriodRequestUSD * 30 / float64(days)
-			backendEstimate.EstimatedMonthlyUSD = backendEstimate.MonthlyStorageUSD + backendEstimate.MonthlyRequestRunRateUSD
 			estimate.MonthlyStorageUSD += backendEstimate.MonthlyStorageUSD
 			estimate.PeriodRequestUSD += backendEstimate.PeriodRequestUSD
 			estimate.MonthlyRequestRunRateUSD += backendEstimate.MonthlyRequestRunRateUSD
@@ -274,7 +362,174 @@ func getCostEstimate(bucketIDs []string, from time.Time, until time.Time, days i
 		}
 		estimate.Backends = append(estimate.Backends, *backendEstimate)
 	}
+
+	bucketEstimates := map[bucketBackendKey]*BucketCostEstimate{}
+	for _, row := range bucketUsageRows {
+		key := bucketBackendKey{BucketID: row.BucketID, StorageBackend: row.StorageBackend}
+		bucketEstimates[key] = &BucketCostEstimate{
+			BucketID:       row.BucketID,
+			BucketName:     row.BucketName,
+			StorageBackend: row.StorageBackend,
+			FileCount:      row.FileCount,
+			StoredBytes:    row.StoredBytes,
+		}
+	}
+	for _, row := range bucketTransferRows {
+		key := bucketBackendKey{BucketID: row.BucketID, StorageBackend: row.StorageBackend}
+		bucketEstimate, ok := bucketEstimates[key]
+		if !ok {
+			bucketEstimate = &BucketCostEstimate{
+				BucketID:       row.BucketID,
+				BucketName:     row.BucketName,
+				StorageBackend: row.StorageBackend,
+			}
+			bucketEstimates[key] = bucketEstimate
+		}
+		switch row.Action {
+		case model.AccessActionUpload, model.AccessActionPresignUpload:
+			bucketEstimate.Uploads += row.Count
+			bucketEstimate.UploadBytes += row.Bytes
+		case model.AccessActionDownload:
+			bucketEstimate.Downloads += row.Count
+			bucketEstimate.DownloadBytes += row.Bytes
+		}
+	}
+	for _, bucketEstimate := range bucketEstimates {
+		if backend, ok := metadataByName[bucketEstimate.StorageBackend]; ok {
+			bucketEstimate.Provider = backend.Provider
+			bucketEstimate.Region = backend.Region
+		}
+		backendEstimate := estimatesByName[bucketEstimate.StorageBackend]
+		priceBucketEstimate(bucketEstimate, backendEstimate, days)
+		estimate.Buckets = append(estimate.Buckets, *bucketEstimate)
+	}
+	sort.Slice(estimate.Buckets, func(i, j int) bool {
+		if estimate.Buckets[i].BucketName == estimate.Buckets[j].BucketName {
+			return estimate.Buckets[i].StorageBackend < estimate.Buckets[j].StorageBackend
+		}
+		return estimate.Buckets[i].BucketName < estimate.Buckets[j].BucketName
+	})
+
+	daily, err := getDailyCostEstimate(bucketIDs, from, until, days, metadataByName)
+	if err != nil {
+		return CostEstimate{}, err
+	}
+	estimate.Daily = daily
 	return estimate, nil
+}
+
+func getDailyCostEstimate(bucketIDs []string, from time.Time, until time.Time, days int, metadataByName map[string]model.StorageBackend) ([]CostPoint, error) {
+	baselineRows := []backendUsageRow{}
+	if err := database.DB.Model(&model.File{}).
+		Where("status = ? AND bucket_id IN ? AND storage_backend != '' AND created_at < ?", model.FileStatusActive, bucketIDs, from).
+		Select("storage_backend, coalesce(sum(size_bytes), 0) AS stored_bytes").
+		Group("storage_backend").
+		Scan(&baselineRows).Error; err != nil {
+		return nil, fmt.Errorf("failed to compute historical storage baseline: %w", err)
+	}
+
+	storageRows := []dailyStorageRow{}
+	if err := database.DB.Model(&model.File{}).
+		Where("status = ? AND bucket_id IN ? AND storage_backend != '' AND created_at >= ? AND created_at < ?", model.FileStatusActive, bucketIDs, from, until).
+		Select("date_trunc('day', created_at) AS day, storage_backend, coalesce(sum(size_bytes), 0) AS bytes").
+		Group("day, storage_backend").
+		Order("day ASC").
+		Scan(&storageRows).Error; err != nil {
+		return nil, fmt.Errorf("failed to compute historical storage changes: %w", err)
+	}
+
+	requestRows := []dailyRequestRow{}
+	if err := database.DB.Model(&model.AccessLog{}).
+		Where("bucket_id IN ? AND storage_backend != '' AND created_at >= ? AND created_at < ? AND action IN ?", bucketIDs, from, until, []model.AccessAction{
+			model.AccessActionUpload,
+			model.AccessActionPresignUpload,
+			model.AccessActionDownload,
+		}).
+		Select("date_trunc('day', created_at) AS day, storage_backend, action, count(*) AS count").
+		Group("day, storage_backend, action").
+		Order("day ASC").
+		Scan(&requestRows).Error; err != nil {
+		return nil, fmt.Errorf("failed to compute daily request costs: %w", err)
+	}
+
+	storageByBackend := make(map[string]int64, len(baselineRows))
+	for _, row := range baselineRows {
+		storageByBackend[row.StorageBackend] = row.StoredBytes
+	}
+	storageByDay := map[string][]dailyStorageRow{}
+	for _, row := range storageRows {
+		date := row.Day.UTC().Format("2006-01-02")
+		storageByDay[date] = append(storageByDay[date], row)
+	}
+	requestsByDay := map[string][]dailyRequestRow{}
+	for _, row := range requestRows {
+		date := row.Day.UTC().Format("2006-01-02")
+		requestsByDay[date] = append(requestsByDay[date], row)
+	}
+
+	points := make([]CostPoint, 0, days)
+	cumulativeRequestUSD := 0.0
+	for i := 0; i < days; i++ {
+		date := from.AddDate(0, 0, i).Format("2006-01-02")
+		for _, row := range storageByDay[date] {
+			storageByBackend[row.StorageBackend] += row.Bytes
+		}
+
+		point := CostPoint{Date: date}
+		for backendName, bytes := range storageByBackend {
+			backend, ok := metadataByName[backendName]
+			if !ok || !supportsAWSS3StandardPricing(backend.Provider, backend.Region) {
+				continue
+			}
+			point.MonthlyStorageUSD += awsS3StandardStorageCost(bytes)
+		}
+		for _, row := range requestsByDay[date] {
+			backend, ok := metadataByName[row.StorageBackend]
+			if !ok || !supportsAWSS3StandardPricing(backend.Provider, backend.Region) {
+				continue
+			}
+			switch row.Action {
+			case model.AccessActionUpload, model.AccessActionPresignUpload:
+				point.UploadRequestUSD += float64(row.Count) * awsS3PutRequestRate
+			case model.AccessActionDownload:
+				point.DownloadRequestUSD += float64(row.Count) * awsS3GetRequestRate
+			}
+		}
+		point.DailyRequestUSD = point.UploadRequestUSD + point.DownloadRequestUSD
+		cumulativeRequestUSD += point.DailyRequestUSD
+		point.MonthlyRequestRunRateUSD = cumulativeRequestUSD * 30 / float64(i+1)
+		point.EstimatedMonthlyUSD = point.MonthlyStorageUSD + point.MonthlyRequestRunRateUSD
+		points = append(points, point)
+	}
+	return points, nil
+}
+
+func priceBackendEstimate(estimate *BackendCostEstimate, days int) {
+	estimate.Priced = supportsAWSS3StandardPricing(estimate.Provider, estimate.Region)
+	if !estimate.Priced {
+		return
+	}
+	estimate.MonthlyStorageUSD = awsS3StandardStorageCost(estimate.StoredBytes)
+	estimate.PeriodRequestUSD = requestCost(estimate.Uploads, estimate.Downloads)
+	estimate.MonthlyRequestRunRateUSD = estimate.PeriodRequestUSD * 30 / float64(days)
+	estimate.EstimatedMonthlyUSD = estimate.MonthlyStorageUSD + estimate.MonthlyRequestRunRateUSD
+}
+
+func priceBucketEstimate(estimate *BucketCostEstimate, backend *BackendCostEstimate, days int) {
+	estimate.Priced = supportsAWSS3StandardPricing(estimate.Provider, estimate.Region)
+	if !estimate.Priced {
+		return
+	}
+	if backend != nil && backend.StoredBytes > 0 {
+		estimate.MonthlyStorageUSD = backend.MonthlyStorageUSD * float64(estimate.StoredBytes) / float64(backend.StoredBytes)
+	}
+	estimate.PeriodRequestUSD = requestCost(estimate.Uploads, estimate.Downloads)
+	estimate.MonthlyRequestRunRateUSD = estimate.PeriodRequestUSD * 30 / float64(days)
+	estimate.EstimatedMonthlyUSD = estimate.MonthlyStorageUSD + estimate.MonthlyRequestRunRateUSD
+}
+
+func requestCost(uploads int64, downloads int64) float64 {
+	return float64(uploads)*awsS3PutRequestRate + float64(downloads)*awsS3GetRequestRate
 }
 
 func supportsAWSS3StandardPricing(provider model.StorageProvider, region string) bool {

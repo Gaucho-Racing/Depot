@@ -67,6 +67,7 @@ func Init() {
 		`CREATE INDEX IF NOT EXISTS idx_depot_storage_backend_search ON depot_storage_backend USING GIN ((lower(coalesce(id, '') || ' ' || coalesce(name, '') || ' ' || coalesce(region, '') || ' ' || coalesce(bucket, '') || ' ' || coalesce(endpoint, ''))) gin_trgm_ops)`,
 		`CREATE INDEX IF NOT EXISTS idx_depot_bucket_grant_search ON depot_bucket_grant USING GIN ((lower(coalesce(id, '') || ' ' || coalesce(bucket_name, '') || ' ' || coalesce(client_id, '') || ' ' || coalesce(description, ''))) gin_trgm_ops)`,
 		`CREATE INDEX IF NOT EXISTS idx_depot_access_log_search ON depot_access_log USING GIN ((lower(coalesce(id, '') || ' ' || coalesce(file_id, '') || ' ' || coalesce(file_name, '') || ' ' || coalesce(bucket_name, '') || ' ' || coalesce(entity_id, '') || ' ' || coalesce(client_id, ''))) gin_trgm_ops)`,
+		`CREATE INDEX IF NOT EXISTS idx_depot_access_log_transfer_stats ON depot_access_log (bucket_id, created_at, storage_backend, action) WHERE storage_backend != ''`,
 	}
 	for _, statement := range searchIndexes {
 		if err := db.Exec(statement).Error; err != nil {

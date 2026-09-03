@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { ArrowDownToLine, ArrowUpFromLine, Boxes, CircleDollarSign, Files, HardDrive } from "lucide-react"
+import { ArrowDownToLine, ArrowRight, ArrowUpFromLine, Boxes, CircleDollarSign, Files, HardDrive } from "lucide-react"
 import { Link } from "react-router-dom"
 import {
   Area,
@@ -14,9 +14,10 @@ import {
 import { ApplicationDisplay } from "@/components/ApplicationDisplay"
 import { IdentityDisplay } from "@/components/IdentityDisplay"
 import { PageContainer, PageHeader } from "@/components/PageContainer"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { formatBytes, getActivity, getStats, getTransferAnalytics } from "@/lib/depot"
+import { formatBytes, formatUSD, getActivity, getStats, getTransferAnalytics } from "@/lib/depot"
 import { useApplicationDirectory, useIdentityDirectory } from "@/lib/directory"
 
 function StatTile({
@@ -47,17 +48,6 @@ function StatTile({
       </CardContent>
     </Card>
   )
-}
-
-function formatUSD(value: number) {
-  if (value === 0) return "$0.00"
-  const fractionDigits = value < 0.0001 ? 8 : value < 0.01 ? 6 : 2
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: fractionDigits,
-  }).format(value)
 }
 
 function formatTrackingDate(value: string) {
@@ -226,13 +216,13 @@ export default function DashboardPage() {
               <CircleDollarSign className="size-5 text-gr-purple" />
               Estimated cost
             </CardTitle>
-            <CardDescription>Monthly storage plus the 30-day request run rate.</CardDescription>
+            <CardDescription>Projected monthly storage and request costs.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-1 flex-col items-start">
             {transfersQuery.isLoading ? (
-              <div className="space-y-4">
+              <div className="w-full space-y-4">
                 <Skeleton className="h-10 w-32" />
-                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-8 w-40" />
               </div>
             ) : transfersQuery.isError || !costEstimate ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
@@ -248,47 +238,20 @@ export default function DashboardPage() {
                   {formatUSD(costEstimate.estimated_monthly_usd)}
                   <span className="ml-1 text-sm font-normal text-muted-foreground">/ month</span>
                 </p>
-                <dl className="mt-5 space-y-2 border-y border-border py-4 text-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <dt className="text-muted-foreground">Stored data</dt>
-                    <dd className="font-mono text-xs tabular-nums">
-                      {formatUSD(costEstimate.monthly_storage_usd)}
-                    </dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <dt className="text-muted-foreground">Request run rate</dt>
-                    <dd className="font-mono text-xs tabular-nums">
-                      {formatUSD(costEstimate.monthly_request_run_rate_usd)}
-                    </dd>
-                  </div>
-                </dl>
-                {costEstimate.backends.length > 0 ? (
-                  <ul className="mt-4 space-y-2">
-                    {costEstimate.backends.map((backend) => (
-                      <li
-                        key={backend.storage_backend}
-                        className="flex items-center justify-between gap-3 text-xs"
-                      >
-                        <span className="min-w-0 truncate text-muted-foreground">
-                          {backend.storage_backend}
-                          {backend.region ? ` · ${backend.region}` : ""}
-                        </span>
-                        <span className="shrink-0 font-mono tabular-nums">
-                          {backend.priced ? formatUSD(backend.estimated_monthly_usd) : "Not priced"}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                {costEstimate.unpriced_backend_count > 0 ? (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    {costEstimate.unpriced_backend_count} backend
+                    {costEstimate.unpriced_backend_count === 1 ? " is" : "s are"} not included.
+                  </p>
                 ) : null}
               </>
             )}
-            {costEstimate ? (
-              <p className="mt-5 text-xs leading-relaxed text-muted-foreground">
-                AWS S3 Standard rates as of {costEstimate.pricing_as_of}. Excludes data transfer,
-                multipart request fan-out, failed and non-transfer API calls, compute, NAT, taxes,
-                discounts, and free tier.
-              </p>
-            ) : null}
+            <Button asChild variant="outline" className="mt-auto">
+              <Link to="/cost-explorer">
+                View cost explorer
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
           </CardContent>
         </Card>
       </div>

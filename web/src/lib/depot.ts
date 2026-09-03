@@ -199,6 +199,35 @@ export type BackendCostEstimate = {
   priced: boolean
 }
 
+export type BucketCostEstimate = {
+  bucket_id: string
+  bucket_name: string
+  storage_backend: string
+  provider: StorageProvider | ""
+  region: string
+  file_count: number
+  stored_bytes: number
+  uploads: number
+  downloads: number
+  upload_bytes: number
+  download_bytes: number
+  monthly_storage_usd: number
+  period_request_usd: number
+  monthly_request_run_rate_usd: number
+  estimated_monthly_usd: number
+  priced: boolean
+}
+
+export type CostPoint = {
+  date: string
+  monthly_storage_usd: number
+  monthly_request_run_rate_usd: number
+  estimated_monthly_usd: number
+  upload_request_usd: number
+  download_request_usd: number
+  daily_request_usd: number
+}
+
 export type CostEstimate = {
   currency: "USD"
   pricing_as_of: string
@@ -211,6 +240,8 @@ export type CostEstimate = {
   unpriced_backend_count: number
   network_transfer_included: boolean
   backends: BackendCostEstimate[]
+  buckets: BucketCostEstimate[]
+  daily: CostPoint[]
 }
 
 export type TransferAnalytics = {
@@ -527,6 +558,17 @@ export function formatBytes(bytes: number) {
   const units = ["B", "KB", "MB", "GB", "TB"]
   const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
   return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`
+}
+
+export function formatUSD(value: number) {
+  if (value === 0) return "$0.00"
+  const fractionDigits = value < 0.0001 ? 8 : value < 0.01 ? 6 : 2
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(value)
 }
 
 export function errorMessage(error: unknown, fallback: string) {
