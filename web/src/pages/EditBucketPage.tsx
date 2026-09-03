@@ -28,11 +28,15 @@ function BucketSettingsForm({ bucket }: { bucket: Bucket }) {
   const [allowAuthenticatedRead, setAllowAuthenticatedRead] = useState(
     bucket.allow_authenticated_read,
   )
+  const [allowAuthenticatedWrite, setAllowAuthenticatedWrite] = useState(
+    bucket.allow_authenticated_write,
+  )
   const [allowPublicFiles, setAllowPublicFiles] = useState(bucket.allow_public_files)
 
   const dirty =
     description !== bucket.description ||
     allowAuthenticatedRead !== bucket.allow_authenticated_read ||
+    allowAuthenticatedWrite !== bucket.allow_authenticated_write ||
     allowPublicFiles !== bucket.allow_public_files
 
   const saveMutation = useMutation({
@@ -40,6 +44,7 @@ function BucketSettingsForm({ bucket }: { bucket: Bucket }) {
       updateBucket(bucket.name, {
         description: description.trim(),
         allow_authenticated_read: allowAuthenticatedRead,
+        allow_authenticated_write: allowAuthenticatedWrite,
         allow_public_files: allowPublicFiles,
       }),
     onSuccess: () => {
@@ -53,6 +58,7 @@ function BucketSettingsForm({ bucket }: { bucket: Bucket }) {
   function reset() {
     setDescription(bucket.description)
     setAllowAuthenticatedRead(bucket.allow_authenticated_read)
+    setAllowAuthenticatedWrite(bucket.allow_authenticated_write)
     setAllowPublicFiles(bucket.allow_public_files)
   }
 
@@ -94,14 +100,33 @@ function BucketSettingsForm({ bucket }: { bucket: Bucket }) {
             <input
               type="checkbox"
               checked={allowAuthenticatedRead}
-              onChange={(event) => setAllowAuthenticatedRead(event.target.checked)}
+              onChange={(event) => {
+                setAllowAuthenticatedRead(event.target.checked)
+                if (!event.target.checked) setAllowAuthenticatedWrite(false)
+              }}
               className="mt-0.5 size-4 accent-(--color-gr-purple)"
             />
             <span>
-              Readable by any authenticated application
+              Readable by any authenticated user or application
               <span className="mt-0.5 block text-xs text-muted-foreground">
-                Any caller with a valid Sentinel token can download from this bucket. Uploads still
-                need a write grant.
+                Any caller with a valid Sentinel token can download from this bucket.
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={allowAuthenticatedWrite}
+              onChange={(event) => {
+                setAllowAuthenticatedWrite(event.target.checked)
+                if (event.target.checked) setAllowAuthenticatedRead(true)
+              }}
+              className="mt-0.5 size-4 accent-(--color-gr-purple)"
+            />
+            <span>
+              Writable by any authenticated user or application
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                Any caller with a valid Sentinel token can upload and download files.
               </span>
             </span>
           </label>

@@ -62,7 +62,7 @@ func InitializeRoutes(router *gin.Engine) {
 	router.GET("/stats/applications/:clientID", GetApplicationStats)
 	router.GET("/files", ListAttributionFiles)
 	router.GET("/files/search", SearchFiles)
-  
+
 	router.GET("/download/:fileID", DownloadFile)
 
 	router.GET("/storage-backends", ListStorageBackends)
@@ -230,7 +230,7 @@ func RequestTokenCanReadBucket(c *gin.Context, bucket model.Bucket) bool {
 	if RequestTokenIsAdmin(c) {
 		return true
 	}
-	if bucket.AllowAuthenticatedRead {
+	if bucket.AllowAuthenticatedRead || bucket.AllowAuthenticatedWrite {
 		return true
 	}
 	if RequestTokenIsFirstParty(c) {
@@ -244,6 +244,9 @@ func RequestTokenCanUploadToBucket(c *gin.Context, bucket model.Bucket) bool {
 		return false
 	}
 	if RequestTokenIsAdmin(c) {
+		return true
+	}
+	if bucket.AllowAuthenticatedWrite {
 		return true
 	}
 	if RequestTokenIsFirstParty(c) {

@@ -206,7 +206,7 @@ func GetActivityStats(bucketIDs []string, days int) ([]ActivityPoint, error) {
 		switch row.Action {
 		case model.AccessActionUpload, model.AccessActionPresignUpload:
 			points[i].Uploads += row.Count
-		case model.AccessActionDownload, model.AccessActionPresignDownload:
+		case model.AccessActionDownload:
 			points[i].Downloads += row.Count
 		case model.AccessActionDelete:
 			points[i].Deletes += row.Count

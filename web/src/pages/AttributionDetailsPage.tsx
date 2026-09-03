@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Link, useParams } from "react-router-dom"
 
 import { ApplicationDisplay } from "@/components/ApplicationDisplay"
-import { FileSheet } from "@/components/FileSheet"
+import { FilePreviewCard } from "@/components/FilePreviewCard"
 import { IdentityDisplay } from "@/components/IdentityDisplay"
 import { PageContainer, PageHeader } from "@/components/PageContainer"
 import { Badge } from "@/components/ui/badge"
@@ -19,6 +19,7 @@ import {
   type DepotFile,
 } from "@/lib/depot"
 import { useApplicationDirectory, useIdentityDirectory } from "@/lib/directory"
+import { cn } from "@/lib/utils"
 
 const PAGE_SIZE = 50
 
@@ -65,6 +66,7 @@ export default function AttributionDetailsPage({ kind }: { kind: AttributionKind
   const [query, setQuery] = useState("")
   const [submittedQuery, setSubmittedQuery] = useState("")
   const [selectedFile, setSelectedFile] = useState<DepotFile | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   const identityDirectory = useIdentityDirectory(kind === "uploader" ? [identifier] : [])
   const applicationDirectory = useApplicationDirectory(kind === "application" ? [identifier] : [])
@@ -93,6 +95,7 @@ export default function AttributionDetailsPage({ kind }: { kind: AttributionKind
   const files = filesQuery.data?.pages.flatMap((page) => page.files) ?? []
   const displayName =
     kind === "uploader" ? identity?.name || identifier : application?.name || identifier
+  const previewVisible = previewOpen && selectedFile !== null
 
   return (
     <PageContainer>
@@ -195,12 +198,20 @@ export default function AttributionDetailsPage({ kind }: { kind: AttributionKind
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Files</CardTitle>
-            <CardDescription>Newest uploads first.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
+        <div
+          className={cn(
+            "grid min-w-0 items-start gap-y-4 transition-[grid-template-columns,column-gap] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
+            previewVisible
+              ? "xl:grid-cols-[minmax(0,1fr)_minmax(20rem,0.85fr)] xl:gap-x-4"
+              : "xl:grid-cols-[minmax(0,1fr)_minmax(0,0fr)] xl:gap-x-0",
+          )}
+        >
+          <Card className="min-w-0">
+            <CardHeader>
+              <CardTitle>Files</CardTitle>
+              <CardDescription>Newest uploads first.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
             <form
               className="mx-4 mb-4 flex h-10 items-center gap-2 rounded-lg border border-input/80 px-2.5"
               onSubmit={(event) => {
@@ -242,8 +253,14 @@ export default function AttributionDetailsPage({ kind }: { kind: AttributionKind
                   <li key={file.id}>
                     <button
                       type="button"
-                      onClick={() => setSelectedFile(file)}
-                      className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 px-4 py-3 text-left transition-colors hover:bg-muted/40 sm:grid-cols-[minmax(0,1fr)_120px_80px_auto]"
+                      onClick={() => {
+                        setSelectedFile(file)
+                        setPreviewOpen(true)
+                      }}
+                      className={cn(
+                        "grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 px-4 py-3 text-left transition-colors hover:bg-muted/40 sm:grid-cols-[minmax(0,1fr)_120px_80px_auto]",
+                        previewVisible && selectedFile?.id === file.id && "bg-muted/60",
+                      )}
                     >
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-medium">
@@ -281,11 +298,26 @@ export default function AttributionDetailsPage({ kind }: { kind: AttributionKind
                 </Button>
               </div>
             )}
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
 
-      <FileSheet file={selectedFile} onClose={() => setSelectedFile(null)} />
+          <div
+            className={cn(
+              "min-w-0 overflow-hidden transition-[max-height] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none xl:sticky xl:top-4 xl:max-h-none",
+              previewVisible ? "max-h-[70vh]" : "max-h-0",
+            )}
+          >
+            {selectedFile && (
+              <FilePreviewCard
+                key={selectedFile.id}
+                file={selectedFile}
+                open={previewVisible}
+                onClose={() => setPreviewOpen(false)}
+              />
+            )}
+          </div>
+        </div>
+      </div>
     </PageContainer>
   )
 }

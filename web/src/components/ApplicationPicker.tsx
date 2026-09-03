@@ -149,10 +149,12 @@ export function ApplicationAccessPicker({
   value,
   onChange,
   readIsRedundant = false,
+  writeIsRedundant = false,
 }: {
   value: ApplicationAccess[]
   onChange: (next: ApplicationAccess[]) => void
   readIsRedundant?: boolean
+  writeIsRedundant?: boolean
 }) {
   const [query, setQuery] = useState("")
   const { data, isLoading, isError } = useApplications()
@@ -177,12 +179,17 @@ export function ApplicationAccessPicker({
 
   return (
     <div className="space-y-3">
-      {readIsRedundant && value.some((entry) => entry.access === "READ") && (
+      {writeIsRedundant && value.length > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          Application grants below have no effect while the bucket is writable by any
+          authenticated caller.
+        </p>
+      ) : readIsRedundant && value.some((entry) => entry.access === "READ") ? (
         <p className="text-xs text-muted-foreground">
           Read grants below have no effect while the bucket is readable by any authenticated
-          application.
+          caller.
         </p>
-      )}
+      ) : null}
       {value.length > 0 && (
         <ul className="space-y-2">
           {value.map((entry) => {

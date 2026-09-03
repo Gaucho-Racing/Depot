@@ -7,6 +7,7 @@ export type Bucket = {
   primary_storage_backend: string
   allow_public_files: boolean
   allow_authenticated_read: boolean
+  allow_authenticated_write: boolean
   created_by_entity_id: string
   updated_by_entity_id: string
   created_at: string
@@ -98,7 +99,13 @@ export type AccessLog = {
   file_name: string
   bucket_id: string
   bucket_name: string
-  action: "UPLOAD" | "PRESIGN_UPLOAD" | "DOWNLOAD" | "PRESIGN_DOWNLOAD" | "DELETE"
+  action:
+    | "UPLOAD"
+    | "PRESIGN_UPLOAD"
+    | "DOWNLOAD"
+    | "DOWNLOAD_FAILED"
+    | "PRESIGN_DOWNLOAD"
+    | "DELETE"
   entity_id: string
   client_id: string
   actor_type: "USER" | "SERVICE_ACCOUNT" | "ANONYMOUS"
@@ -200,6 +207,7 @@ export type BucketInput = {
   primary_storage_backend: string
   allow_public_files: boolean
   allow_authenticated_read: boolean
+  allow_authenticated_write: boolean
 }
 
 export type BucketUpdateInput = Omit<BucketInput, "name" | "primary_storage_backend">
@@ -371,17 +379,11 @@ function filenameFromDisposition(header: string | undefined) {
   return plain?.[1]
 }
 
-/**
- * downloadFile streams a file through Depot rather than handing the browser a
- * presigned URL. Depot sees the transfer, so the access log records a real
- * download. Files are addressed by id alone. The response is buffered in
- * memory, so this is the wrong choice for very large objects —
- * createDownloadURL is the direct-from-storage alternative.
- */
 export async function downloadFile(id: string, onProgress?: (percent: number) => void) {
   const response = await api.get<Blob>(
     `/download/${encodeURIComponent(id)}`,
     {
+      adapter: "fetch",
       responseType: "blob",
       onDownloadProgress: (event) => {
         if (onProgress && event.total) {
@@ -406,7 +408,12 @@ export async function downloadFile(id: string, onProgress?: (percent: number) =>
 }
 
 export async function createDownloadURL(bucket: string, id: string) {
-  const response = await api.post<{ url: string; method: string; expires_at: string }>(
+  const response = await api.post<{
+    url: string
+    path: string
+    method: string
+    expires_at: string
+  }>(
     `/buckets/${encodeURIComponent(bucket)}/files/${encodeURIComponent(id)}/download-url`,
   )
   return response.data

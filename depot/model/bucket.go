@@ -8,13 +8,12 @@ type Bucket struct {
 	Description           string `json:"description"`
 	PrimaryStorageBackend string `json:"primary_storage_backend" gorm:"index"`
 	AllowPublicFiles      bool   `json:"allow_public_files"`
-	// AllowAuthenticatedRead opens reads to any valid Sentinel token, whoever
-	// it belongs to. Writes still require a WRITE grant.
-	AllowAuthenticatedRead bool      `json:"allow_authenticated_read"`
-	CreatedByEntityID      string    `json:"created_by_entity_id" gorm:"index"`
-	UpdatedByEntityID      string    `json:"updated_by_entity_id" gorm:"index"`
-	CreatedAt              time.Time `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt              time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	AllowAuthenticatedRead  bool      `json:"allow_authenticated_read"`
+	AllowAuthenticatedWrite bool      `json:"allow_authenticated_write"`
+	CreatedByEntityID       string    `json:"created_by_entity_id" gorm:"index"`
+	UpdatedByEntityID       string    `json:"updated_by_entity_id" gorm:"index"`
+	CreatedAt               time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt               time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 }
 
 func (Bucket) TableName() string {

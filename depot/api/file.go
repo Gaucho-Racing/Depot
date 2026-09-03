@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gaucho-racing/depot/depot/config"
 	"github.com/gaucho-racing/depot/depot/model"
@@ -315,7 +317,13 @@ func GetFileAccessLogs(c *gin.Context) {
 	}
 	Require(c, RequestTokenIsAdmin(c))
 
-	logs, err := service.ListFileAccessLogs(file.ID, 100)
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "5"))
+	if err != nil || limit < 1 || limit > 100 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "limit must be an integer between 1 and 100"})
+		return
+	}
+
+	logs, err := service.ListFileAccessLogs(file.ID, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -324,6 +332,15 @@ func GetFileAccessLogs(c *gin.Context) {
 }
 
 func DownloadFile(c *gin.Context) {
+	if tokenID, exists := c.GetQuery("token"); exists {
+		if tokenID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "download token is required"})
+			return
+		}
+		downloadFileWithToken(c, c.Param("fileID"), tokenID)
+		return
+	}
+
 	file, bucket, ok := findFileByID(c)
 	if !ok {
 		return
@@ -335,21 +352,14 @@ func DownloadFile(c *gin.Context) {
 		return
 	}
 
-	body, err := service.OpenFile(c.Request.Context(), file)
+	actor := requestActor(c)
+	written, err := streamFile(c, file, fmt.Sprintf("attachment; filename=%q", file.DownloadName()))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		service.RecordAccess(file, model.AccessActionDownloadFailed, actor)
+		handleFileStreamError(c, file, written, err)
 		return
 	}
-	defer body.Close()
-
-	contentType := file.ContentType
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
-	service.RecordAccess(file, model.AccessActionDownload, requestActor(c))
-	c.DataFromReader(http.StatusOK, file.SizeBytes, contentType, body, map[string]string{
-		"Content-Disposition": fmt.Sprintf("inline; filename=%q", file.DownloadName()),
-	})
+	service.RecordAccess(file, model.AccessActionDownload, actor)
 }
 
 func CreateDownloadURL(c *gin.Context) {
@@ -361,24 +371,97 @@ func CreateDownloadURL(c *gin.Context) {
 	if !ok {
 		return
 	}
-	Require(c, publiclyReadable(bucket, file) || RequestTokenCanReadBucket(c, bucket))
+	Require(c, RequestTokenExists(c) && (publiclyReadable(bucket, file) || RequestTokenCanReadBucket(c, bucket)))
 
 	if file.Status != model.FileStatusActive {
 		c.JSON(http.StatusConflict, gin.H{"error": "file upload has not been completed"})
 		return
 	}
 
-	request, err := service.PresignDownload(c.Request.Context(), file)
+	token, err := service.CreateDownloadToken(file, requestActor(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	service.RecordAccess(file, model.AccessActionPresignDownload, requestActor(c))
+	c.Header("Cache-Control", "no-store")
+	path := "/api/download/" + url.PathEscape(file.ID) + "?token=" + url.QueryEscape(token.ID)
 	c.JSON(http.StatusOK, gin.H{
-		"url":        request.URL,
-		"method":     request.Method,
-		"expires_at": request.ExpiresAt,
+		"url":        requestBaseURL(c) + path,
+		"path":       path,
+		"method":     http.MethodGet,
+		"expires_at": token.ExpiresAt,
 	})
+}
+
+func downloadFileWithToken(c *gin.Context, fileID string, tokenID string) {
+	token, file, err := service.ResolveDownloadToken(tokenID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "download token not found or expired"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if file.ID != fileID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "download token not found or expired"})
+		return
+	}
+	if file.Status != model.FileStatusActive {
+		c.JSON(http.StatusConflict, gin.H{"error": "file upload has not been completed"})
+		return
+	}
+
+	actor := service.Actor{
+		EntityID: token.EntityID,
+		ClientID: token.ClientID,
+		Type:     token.ActorType,
+	}
+	secondsRemaining := max(0, int64(time.Until(token.ExpiresAt).Seconds()))
+	c.Header("Cache-Control", fmt.Sprintf("private, max-age=%d", secondsRemaining))
+	c.Header("Content-Security-Policy", "sandbox; default-src 'none'")
+	c.Header("Referrer-Policy", "no-referrer")
+	c.Header("X-Content-Type-Options", "nosniff")
+
+	written, err := streamFile(c, file, fmt.Sprintf("inline; filename=%q", file.DownloadName()))
+	if err != nil {
+		service.RecordAccess(file, model.AccessActionDownloadFailed, actor)
+		handleFileStreamError(c, file, written, err)
+		return
+	}
+	service.RecordAccess(file, model.AccessActionDownload, actor)
+}
+
+func streamFile(c *gin.Context, file model.File, contentDisposition string) (int64, error) {
+	body, err := service.OpenFile(c.Request.Context(), file)
+	if err != nil {
+		return 0, err
+	}
+	defer body.Close()
+
+	contentType := file.ContentType
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	c.Header("Content-Disposition", contentDisposition)
+	c.Header("Content-Length", strconv.FormatInt(file.SizeBytes, 10))
+	c.Header("Content-Type", contentType)
+	c.Status(http.StatusOK)
+
+	written, err := io.Copy(c.Writer, body)
+	if err == nil && written != file.SizeBytes {
+		err = fmt.Errorf("incomplete transfer: wrote %d of %d bytes", written, file.SizeBytes)
+	}
+	return written, err
+}
+
+func handleFileStreamError(c *gin.Context, file model.File, written int64, err error) {
+	streamErr := fmt.Errorf("failed to stream file %s after %d bytes: %w", file.ID, written, err)
+	if !c.Writer.Written() {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": streamErr.Error()})
+		return
+	}
+	_ = c.Error(streamErr)
 }
 
 func InitiateUpload(c *gin.Context) {

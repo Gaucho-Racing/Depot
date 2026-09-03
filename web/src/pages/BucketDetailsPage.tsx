@@ -3,7 +3,7 @@ import { FileIcon, Globe, Lock, Pencil, Search, Upload } from "lucide-react"
 import { useState } from "react"
 import { Link, useParams, useSearchParams } from "react-router-dom"
 
-import { FileSheet } from "@/components/FileSheet"
+import { FilePreviewCard } from "@/components/FilePreviewCard"
 import { PageContainer, PageHeader } from "@/components/PageContainer"
 import { UploadDialog } from "@/components/UploadDialog"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/lib/auth"
+import { cn } from "@/lib/utils"
 import {
   formatBytes,
   getBucket,
@@ -35,9 +36,10 @@ export default function BucketDetailsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { isAdmin } = useAuth()
 
+  const linkedFileID = searchParams.get("file") ?? ""
   const [search, setSearch] = useState("")
   const [selectedFile, setSelectedFile] = useState<DepotFile | null>(null)
-  const linkedFileID = searchParams.get("file") ?? ""
+  const [previewOpen, setPreviewOpen] = useState(linkedFileID !== "")
 
   const bucketQuery = useQuery({
     queryKey: ["bucket", bucketName],
@@ -61,20 +63,33 @@ export default function BucketDetailsPage() {
   const bucket = bucketQuery.data
   const files = filesQuery.data ?? []
   const activeFile = selectedFile ?? linkedFileQuery.data ?? null
+  const previewVisible = previewOpen && activeFile !== null
   const bucketStats = statsQuery.data?.buckets.find((entry) => entry.bucket_id === bucket?.id)
 
   const grants = grantsQuery.data
   // Undefined while the request is in flight — unknown rather than zero.
   const appCount = (count: number) =>
     count === 0 ? "Admins only" : `${count} application${count === 1 ? "" : "s"}`
-  const readAccess = bucket?.allow_authenticated_read
-    ? "Any application"
+  const readAccess = bucket?.allow_authenticated_read || bucket?.allow_authenticated_write
+    ? "Any authenticated caller"
     : grants
       ? appCount(grants.length)
       : "—"
-  const writeAccess = grants
-    ? appCount(grants.filter((grant) => grant.access === "WRITE").length)
-    : "—"
+  const writeAccess = bucket?.allow_authenticated_write
+    ? "Any authenticated caller"
+    : grants
+      ? appCount(grants.filter((grant) => grant.access === "WRITE").length)
+      : "—"
+
+  function closeFilePreview() {
+    if (activeFile) setSelectedFile(activeFile)
+    setPreviewOpen(false)
+    if (linkedFileID) {
+      const next = new URLSearchParams(searchParams)
+      next.delete("file")
+      setSearchParams(next, { replace: true })
+    }
+  }
 
   return (
     <PageContainer>
@@ -91,7 +106,7 @@ export default function BucketDetailsPage() {
                 </Link>
               </Button>
             )}
-            {isAdmin && bucket && (
+            {bucket && (isAdmin || bucket.allow_authenticated_write) && (
               <UploadDialog
                 trigger={
                   <Button>
@@ -128,82 +143,104 @@ export default function BucketDetailsPage() {
         />
       </div>
 
-      {filesQuery.isLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <Skeleton key={index} className="h-14 rounded-lg" />
-          ))}
-        </div>
-      ) : files.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-muted">
-              <FileIcon className="size-4 text-muted-foreground" />
-            </div>
-            <p className="mt-3 text-sm font-medium">
-              {search ? "No files match your search" : "No files in this bucket yet"}
-            </p>
-            {!search && (
-              <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-                Upload one here, or grant an application write access to send files from a service.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="p-0">
-            <ul className="divide-y divide-border">
-              {files.map((file) => (
-                <li key={file.id}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedFile(file)}
-                    className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-0.5 px-4 py-3 text-left transition-colors hover:bg-muted/40 sm:grid-cols-[minmax(0,1fr)_110px_90px_auto]"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate font-mono text-sm font-medium">
-                        {file.id}
-                      </span>
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {[file.original_name, file.path].filter(Boolean).join(" · ") || "—"}
-                      </span>
-                    </span>
-                    <span className="hidden truncate text-xs text-muted-foreground sm:block">
-                      {file.content_type || "unknown"}
-                    </span>
-                    <span className="hidden text-right font-mono text-xs tabular-nums text-muted-foreground sm:block">
-                      {formatBytes(file.size_bytes)}
-                    </span>
-                    <span className="flex items-center justify-end gap-2">
-                      {file.public ? (
-                        <Globe className="size-3.5 text-gr-purple" />
-                      ) : (
-                        <Lock className="size-3.5 text-muted-foreground/60" />
-                      )}
-                      <span className="text-xs tabular-nums text-muted-foreground">
-                        {new Date(file.created_at).toLocaleDateString()}
-                      </span>
-                    </span>
-                  </button>
-                </li>
+      <div
+        className={cn(
+          "grid items-start gap-y-4 transition-[grid-template-columns,column-gap] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
+          previewVisible
+            ? "xl:grid-cols-[minmax(0,1fr)_minmax(20rem,0.55fr)] xl:gap-x-4"
+            : "xl:grid-cols-[minmax(0,1fr)_minmax(0,0fr)] xl:gap-x-0",
+        )}
+      >
+        <div className="min-w-0">
+          {filesQuery.isLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <Skeleton key={index} className="h-14 rounded-lg" />
               ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
+            </div>
+          ) : files.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="flex size-9 items-center justify-center rounded-lg bg-muted">
+                  <FileIcon className="size-4 text-muted-foreground" />
+                </div>
+                <p className="mt-3 text-sm font-medium">
+                  {search ? "No files match your search" : "No files in this bucket yet"}
+                </p>
+                {!search && (
+                  <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+                    Upload one here, or grant an application write access to send files from a
+                    service.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-0">
+                <ul className="divide-y divide-border">
+                  {files.map((file) => (
+                    <li key={file.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedFile(file)
+                          setPreviewOpen(true)
+                        }}
+                        className={cn(
+                          "grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-0.5 px-4 py-3 text-left transition-colors hover:bg-muted/40 sm:grid-cols-[minmax(0,1fr)_110px_90px_auto]",
+                          previewVisible && activeFile?.id === file.id && "bg-muted/60",
+                        )}
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-mono text-sm font-medium">
+                            {file.id}
+                          </span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {[file.original_name, file.path].filter(Boolean).join(" · ") || "—"}
+                          </span>
+                        </span>
+                        <span className="hidden truncate text-xs text-muted-foreground sm:block">
+                          {file.content_type || "unknown"}
+                        </span>
+                        <span className="hidden text-right font-mono text-xs tabular-nums text-muted-foreground sm:block">
+                          {formatBytes(file.size_bytes)}
+                        </span>
+                        <span className="flex items-center justify-end gap-2">
+                          {file.public ? (
+                            <Globe className="size-3.5 text-gr-purple" />
+                          ) : (
+                            <Lock className="size-3.5 text-muted-foreground/60" />
+                          )}
+                          <span className="text-xs tabular-nums text-muted-foreground">
+                            {new Date(file.created_at).toLocaleDateString()}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
-      <FileSheet
-        file={activeFile}
-        onClose={() => {
-          setSelectedFile(null)
-          if (linkedFileID) {
-            const next = new URLSearchParams(searchParams)
-            next.delete("file")
-            setSearchParams(next, { replace: true })
-          }
-        }}
-      />
+        <div
+          className={cn(
+            "min-w-0 overflow-hidden transition-[max-height] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none xl:sticky xl:top-4 xl:max-h-none",
+            previewVisible ? "max-h-[70vh]" : "max-h-0",
+          )}
+        >
+          {activeFile && (
+            <FilePreviewCard
+              key={activeFile.id}
+              file={activeFile}
+              open={previewVisible}
+              onClose={closeFilePreview}
+            />
+          )}
+        </div>
+      </div>
     </PageContainer>
   )
 }
