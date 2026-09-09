@@ -171,15 +171,6 @@ func RequestTokenExists(c *gin.Context) bool {
 	return exists
 }
 
-func RequestTokenHasScope(c *gin.Context, scope string) bool {
-	for _, tokenScope := range strings.Fields(GetRequestTokenScopes(c)) {
-		if tokenScope == scope {
-			return true
-		}
-	}
-	return false
-}
-
 func RequestTokenHasGroupName(c *gin.Context, groupName string) bool {
 	for _, tokenGroup := range GetRequestTokenGroupNames(c) {
 		if tokenGroup == groupName {
@@ -209,13 +200,9 @@ const AdminGroupName = "DepotAdmins"
 // the token must have been minted for Depot's own OAuth client, and its entity
 // must belong to the DepotAdmins group. An application token can never
 // reshape Depot regardless of what its entity's group memberships say.
-// sentinel:all remains as first-party break-glass for Sentinel's own tooling.
 func RequestTokenIsAdmin(c *gin.Context) bool {
 	if !RequestTokenExists(c) {
 		return false
-	}
-	if RequestTokenHasScope(c, "sentinel:all") {
-		return true
 	}
 	return RequestTokenIsFirstParty(c) && RequestTokenHasGroupName(c, AdminGroupName)
 }
