@@ -20,8 +20,6 @@ services:
       dockerfile: Dockerfile.dev
     restart: always
     working_dir: /app
-    ports:
-      - "127.0.0.1:9999:9999"
     volumes:
       - ./depot:/app
       - depot_gopath:/go
@@ -53,8 +51,6 @@ services:
     working_dir: /app
     command: >
       sh -c "npm install && npm run dev -- --host 0.0.0.0"
-    ports:
-      - "127.0.0.1:5173:5173"
     volumes:
       - ./web:/app
       - web_node_modules:/app/node_modules
@@ -71,8 +67,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: depot
-    ports:
-      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql
 
